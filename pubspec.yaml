@@ -30,10 +30,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  flutter_animate: ^4.5.2
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^1.0.9
   firebase_core: ^4.6.0
   cloud_firestore: ^6.2.0
   firebase_auth: ^6.3.0
@@ -41,6 +41,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   provider: ^6.1.5+1
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +64,8 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
       - assets/image/wallhaven-x136yd_1920x1080.png
+      - assets/image/facebook_logo.png
+      - assets/image/google_logo.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -78,13 +81,13 @@ flutter:
   fonts:
     - family: Poppins
       fonts:
-        - asset: lib/font/Poppins-Bold.ttf
+        - asset: assets/font/Poppins-Bold.ttf
           weight: 700
-        - asset: lib/font/Poppins-Medium.ttf
+        - asset: assets/font/Poppins-Medium.ttf
           weight: 500
-        - asset: lib/font/Poppins-Regular.ttf
+        - asset: assets/font/Poppins-Regular.ttf
           weight: 400
-        - asset: lib/font/Poppins-SemiBold.ttf
+        - asset: assets/font/Poppins-SemiBold.ttf
           weight: 600
   #   - family: Trajan Pro
   #     fonts:
