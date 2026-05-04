@@ -7,10 +7,10 @@ class BmiRecord {
   final double activityLevel;
 
   // ── Kết quả tính toán ─────────────────────────────────────
-  final double bmi;       // Chỉ số BMI
+  final double bmi; // Chỉ số BMI
   final String bmiStatus; // Phân loại BMI
-  final int bmr;          // Basal Metabolic Rate (kcal/ngày)
-  final int tdee;         // Total Daily Energy Expenditure (kcal/ngày)
+  final int bmr; // Basal Metabolic Rate (kcal/ngày)
+  final int tdee; // Total Daily Energy Expenditure (kcal/ngày)
 
   final DateTime timestamp;
 
@@ -37,8 +37,9 @@ class BmiRecord {
   }) {
     // Tính BMI
     final double heightM = height / 100;
-    final double bmiVal =
-        double.parse((weight / (heightM * heightM)).toStringAsFixed(1));
+    final double bmiVal = double.parse(
+      (weight / (heightM * heightM)).toStringAsFixed(1),
+    );
 
     // Tính BMR theo công thức Mifflin-St Jeor
     final double bmrVal = gender == 'Male'
@@ -80,17 +81,17 @@ class BmiRecord {
 
   /// Chuyển thành Map để lưu lên Firestore
   Map<String, dynamic> toMap() => {
-        'weight': weight,
-        'height': height,
-        'age': age,
-        'gender': gender,
-        'activity_level': activityLevel,
-        'bmi': bmi,
-        'bmi_status': bmiStatus,
-        'bmr': bmr,
-        'tdee': tdee,
-        'timestamp': timestamp,
-      };
+    'weight': weight,
+    'height': height,
+    'age': age,
+    'gender': gender,
+    'activity_level': activityLevel,
+    'bmi': bmi,
+    'bmi_status': bmiStatus,
+    'bmr': bmr,
+    'tdee': tdee,
+    'timestamp': timestamp,
+  };
 
   static String getBmiStatus(double bmi) {
     if (bmi <= 0) return 'Ready to calculate';

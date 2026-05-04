@@ -2,6 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/bmi_service.dart';
+import '../../services/nutrition_service.dart';
+import '../../user/bmi_record.dart';
+import '../../user/meal_entry.dart';
 import 'bmi_view.dart';
 import 'calo_tracking_view.dart';
 import 'exercise_library_view.dart';
@@ -15,93 +19,35 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> {
+  static const _accent = Color(0xFFE16D6D);
+  static const _surface = Color.fromARGB(16, 218, 218, 218);
+  static const _navSelected = Color.fromARGB(255, 133, 20, 20);
+  static const _cardShadow = [
+    BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 6)),
+  ];
+
   int _selectedIndex = 0;
+  final NutritionService _nutritionService = NutritionService.instance;
+  final BmiService _bmiService = BmiService();
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final photoUrl = user?.photoURL;
 
-    final List<Widget> pages = [
-      CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            snap: false,
-            backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            toolbarHeight: 70,
-            titleSpacing: 20,
-            title: Stack(
-              alignment: Alignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.35,
-                    child: Text(
-                      'Welcome back, ${user?.displayName ?? user?.email?.split('@')[0] ?? 'User'}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700,
-                        color: Color.fromARGB(255, 215, 215, 215),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.center,
-                  child: Image.asset(
-                    'assets/image/Gemini_Generated_Image_rym0ohrym0ohrym0.png',
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.grey.shade900,
-                    backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                        ? NetworkImage(photoUrl)
-                        : null,
-                    child: photoUrl == null || photoUrl.isEmpty
-                        ? const Icon(Icons.person, color: Colors.white)
-                        : null,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: _buildLatestHealthSection(user),
-            ),
-          ),
-        ],
-      ),
-      const BmiView(),
-      const CaloTrackingView(),
-      const ScheduleView(),
-      const ExerciseLibraryView(),
-    ];
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         bottom: false,
-        child: IndexedStack(index: _selectedIndex, children: pages),
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _pages(user, photoUrl),
+        ),
       ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           backgroundColor: const Color(0xFF121212),
-          indicatorColor: const Color.fromARGB(255, 133, 20, 20),
+          indicatorColor: _navSelected,
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
               return const TextStyle(
@@ -163,6 +109,91 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // Main tabs rendered by the bottom navigation bar.
+  List<Widget> _pages(User? user, String? photoUrl) => [
+    CustomScrollView(
+      slivers: [
+        _buildHomeAppBar(user, photoUrl),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Column(
+              children: [
+                _buildLatestHealthSection(user),
+                const SizedBox(height: 18),
+                _buildTodayNutritionSection(user),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+    const BmiView(),
+    const CaloTrackingView(),
+    const ScheduleView(),
+    const ExerciseLibraryView(),
+  ];
+
+  // Home app bar: greeting, logo, and user avatar.
+  Widget _buildHomeAppBar(User? user, String? photoUrl) {
+    final username = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
+    final avatar = _avatarImage(photoUrl);
+
+    return SliverAppBar(
+      floating: true,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      toolbarHeight: 70,
+      titleSpacing: 20,
+      title: Stack(
+        alignment: Alignment.center,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Builder(
+              builder: (context) => SizedBox(
+                width: MediaQuery.of(context).size.width * 0.35,
+                child: Text(
+                  'Welcome back, $username',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    color: Color.fromARGB(255, 215, 215, 215),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: Image.asset(
+              'assets/image/Gemini_Generated_Image_rym0ohrym0ohrym0.png',
+              width: 56,
+              height: 56,
+              fit: BoxFit.contain,
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: CircleAvatar(
+              radius: 24,
+              backgroundColor: Colors.grey.shade900,
+              backgroundImage: avatar,
+              child: avatar == null
+                  ? const Icon(Icons.person, color: Colors.white)
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Latest BMI/TDEE summary card from the newest health record.
   Widget _buildLatestHealthSection(User? user) {
     if (user == null) {
       return _buildMessageCard(
@@ -214,11 +245,7 @@ class _HomeViewState extends State<HomeView> {
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.insights_rounded,
-                  color: Color(0xFFE16D6D),
-                  size: 22,
-                ),
+                const Icon(Icons.insights_rounded, color: _accent, size: 22),
                 const SizedBox(width: 8),
                 Text(
                   'Latest metrics',
@@ -234,18 +261,7 @@ class _HomeViewState extends State<HomeView> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: const Color.fromARGB(16, 218, 218, 218),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white10),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 12,
-                    offset: Offset(0, 6),
-                  ),
-                ],
-              ),
+              decoration: _cardDecoration(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -356,7 +372,7 @@ class _HomeViewState extends State<HomeView> {
                         });
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 133, 20, 20),
+                        backgroundColor: _navSelected,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -377,6 +393,230 @@ class _HomeViewState extends State<HomeView> {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  // Daily nutrition summary and comparison with TDEE.
+  Widget _buildTodayNutritionSection(User? user) {
+    if (user == null) {
+      return _buildMessageCard(
+        icon: Icons.restaurant_menu_rounded,
+        title: 'Daily meal dashboard locked',
+        message:
+            'Sign in to display today\'s meals, calories, and quick nutrition overview.',
+      );
+    }
+
+    final mealStream = _nutritionService.getTodayMealEntriesStream();
+    final bmiStream = _bmiService.getLatestRecordStream();
+    if (mealStream == null) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<BmiRecord?>(
+      stream: bmiStream,
+      builder: (context, snapshot) {
+        final latestRecord = snapshot.data;
+
+        return StreamBuilder<List<MealEntry>>(
+          stream: mealStream,
+          builder: (context, mealSnapshot) {
+            if (mealSnapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(22),
+                decoration: _cardDecoration(hasShadow: false),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: Color.fromARGB(255, 180, 50, 50),
+                  ),
+                ),
+              );
+            }
+
+            final entries = mealSnapshot.data ?? const <MealEntry>[];
+            final calories = entries.fold<double>(
+              0,
+              (total, item) => total + item.calories,
+            );
+            final protein = entries.fold<double>(
+              0,
+              (total, item) => total + item.protein,
+            );
+            final fat = entries.fold<double>(
+              0,
+              (total, item) => total + item.fat,
+            );
+            final carbs = entries.fold<double>(
+              0,
+              (total, item) => total + item.carbs,
+            );
+            final balance = latestRecord == null
+                ? null
+                : calories - latestRecord.tdee;
+            final weeklyKgChange = balance == null
+                ? null
+                : (balance * 7) / 7700;
+            final balanceColor = _balanceColor(balance);
+
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
+              decoration: _cardDecoration(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.restaurant_menu_rounded,
+                        color: _accent,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Today\'s menu',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontFamily: 'Poppins',
+                            ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedIndex = 2;
+                          });
+                        },
+                        child: const Text(
+                          'Open tracker',
+                          style: TextStyle(
+                            color: _accent,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (entries.isEmpty)
+                    Text(
+                      'No foods logged today. Use Calo Track to build your plan and show it here.',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 13,
+                        height: 1.5,
+                        fontFamily: 'Poppins',
+                      ),
+                    )
+                  else ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildOverviewStat(
+                            title: 'Calories',
+                            value: calories.toStringAsFixed(0),
+                            unit: 'kcal',
+                            icon: Icons.local_fire_department_rounded,
+                            color: const Color(0xFFFF9F43),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildOverviewStat(
+                            title: 'Protein',
+                            value: protein.toStringAsFixed(1),
+                            unit: 'g',
+                            icon: Icons.egg_alt_rounded,
+                            color: const Color(0xFF64B5F6),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildOverviewStat(
+                            title: 'Fat',
+                            value: fat.toStringAsFixed(1),
+                            unit: 'g',
+                            icon: Icons.opacity_rounded,
+                            color: const Color(0xFFFFB74D),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildOverviewStat(
+                            title: 'Carbs',
+                            value: carbs.toStringAsFixed(1),
+                            unit: 'g',
+                            icon: Icons.grain_rounded,
+                            color: Colors.greenAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    if (latestRecord == null)
+                      Text(
+                        'Open BMI & TDEE to calculate your maintenance calories before comparing your meal plan.',
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 12,
+                          height: 1.5,
+                          fontFamily: 'Poppins',
+                        ),
+                      )
+                    else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildOverviewStat(
+                              title: 'Balance',
+                              value: balance!.abs().toStringAsFixed(0),
+                              unit: 'kcal',
+                              icon: balance < 0
+                                  ? Icons.trending_down_rounded
+                                  : Icons.trending_up_rounded,
+                              color: balanceColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildOverviewStat(
+                              title: 'Est. weight',
+                              value: _formatKgChange(weeklyKgChange!),
+                              unit: 'per week',
+                              icon: Icons.monitor_weight_rounded,
+                              color: balanceColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _goalSummary(balance, weeklyKgChange),
+                        style: TextStyle(
+                          color: Colors.grey.shade300,
+                          fontSize: 12,
+                          height: 1.5,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    ...entries.take(4).map(_buildMealPreviewChip),
+                  ],
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -407,11 +647,7 @@ class _HomeViewState extends State<HomeView> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: const Color.fromARGB(16, 218, 218, 218),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white10),
-      ),
+      decoration: _cardDecoration(hasShadow: false),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -421,7 +657,7 @@ class _HomeViewState extends State<HomeView> {
               color: Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(icon, color: const Color(0xFFE16D6D), size: 28),
+            child: Icon(icon, color: _accent, size: 28),
           ),
           const SizedBox(height: 16),
           Text(
@@ -448,7 +684,7 @@ class _HomeViewState extends State<HomeView> {
             TextButton(
               onPressed: onAction,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFE16D6D),
+                foregroundColor: _accent,
                 padding: EdgeInsets.zero,
               ),
               child: Text(
@@ -465,6 +701,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // Reusable stat tile for calories, protein, BMI, TDEE, etc.
   Widget _buildOverviewStat({
     required String title,
     required String value,
@@ -515,6 +752,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  // Small info chip for weight, gender, age, and similar data.
   Widget _buildInfoChip(IconData icon, String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -526,7 +764,7 @@ class _HomeViewState extends State<HomeView> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: const Color(0xFFE16D6D)),
+          Icon(icon, size: 16, color: _accent),
           const SizedBox(width: 6),
           Text(
             text,
@@ -540,6 +778,112 @@ class _HomeViewState extends State<HomeView> {
         ],
       ),
     );
+  }
+
+  // Quick preview for foods logged today.
+  Widget _buildMealPreviewChip(MealEntry entry) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _accent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.restaurant_rounded,
+              color: _accent,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.foodName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${entry.mealType} • ${entry.grams.toStringAsFixed(0)}g',
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${entry.calories.toStringAsFixed(0)} kcal',
+            style: const TextStyle(
+              color: Color(0xFFFF9F43),
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Shared card style to keep the UI consistent and the code shorter.
+  BoxDecoration _cardDecoration({bool hasShadow = true}) => BoxDecoration(
+    color: _surface,
+    borderRadius: BorderRadius.circular(24),
+    border: Border.all(color: Colors.white10),
+    boxShadow: hasShadow ? _cardShadow : null,
+  );
+
+  ImageProvider? _avatarImage(String? photoUrl) =>
+      photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null;
+
+  Color _balanceColor(double? balance) {
+    if (balance == null) {
+      return Colors.grey;
+    }
+    if (balance <= -150) {
+      return Colors.greenAccent;
+    }
+    if (balance >= 150) {
+      return const Color(0xFFFFB74D);
+    }
+    return const Color(0xFF64B5F6);
+  }
+
+  String _formatKgChange(double weeklyKgChange) {
+    if (weeklyKgChange.abs() < 0.01) {
+      return '~0.00';
+    }
+    final sign = weeklyKgChange > 0 ? '+' : '-';
+    return '$sign${weeklyKgChange.abs().toStringAsFixed(2)}';
+  }
+
+  String _goalSummary(double balance, double weeklyKgChange) {
+    if (balance <= -150) {
+      return 'You are under TDEE by about ${balance.abs().toStringAsFixed(0)} kcal today, roughly ${weeklyKgChange.abs().toStringAsFixed(2)} kg loss/week if maintained.';
+    }
+    if (balance >= 150) {
+      return 'You are above TDEE by about ${balance.abs().toStringAsFixed(0)} kcal today, roughly ${weeklyKgChange.abs().toStringAsFixed(2)} kg gain/week if maintained.';
+    }
+    return 'Your intake is close to maintenance today, so your body weight should stay relatively stable if this pattern continues.';
   }
 
   String _getBmiStatus(double bmi) {

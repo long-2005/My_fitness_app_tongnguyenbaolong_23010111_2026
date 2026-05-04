@@ -55,4 +55,23 @@ class BmiService {
       }).toList();
     });
   }
+
+  Stream<BmiRecord?>? getLatestRecordStream() {
+    final user = currentUser;
+    if (user == null) return null;
+
+    return _userRecords(user.uid)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) {
+        return null;
+      }
+      final data = snapshot.docs.first.data();
+      final ts = data['timestamp'] as Timestamp?;
+      final date = ts?.toDate() ?? DateTime.now();
+      return BmiRecord.fromMap(data, date);
+    });
+  }
 }
