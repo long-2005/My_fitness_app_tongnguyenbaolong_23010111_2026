@@ -29,8 +29,6 @@ Trong bài, danh sách `BmiRecord` không được lưu local trong RAM mà lưu
 - **`_buildHistoryCard(record)`** — hàm này truy vấn dữ liệu từ Firebase và in ra lịch sử các bản ghi.
 
 **Cơ chế Update hiện tại:** Người dùng nhập lại input → nhấn *Calculate & Save* → tạo bản ghi mới lưu vào Firestore.
-
-Đây là thiết kế hợp lý cho ứng dụng health tracking: mỗi lần đo là một bản ghi mới, không ghi đè lịch sử cũ.
 ----------------------------------------------------------------------------------------
 
 thêm database cho trang calo tracking 
