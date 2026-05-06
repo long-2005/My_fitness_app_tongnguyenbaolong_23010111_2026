@@ -91,7 +91,6 @@ class AboutPage extends StatelessWidget {
             
             const SizedBox(height: 80),
 
-            // Section "What we believe" - Gắn idea BmiRecord của nhóm
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Row(
