@@ -21,7 +21,6 @@ class _AboutPageState extends State<AboutPage> {
   @override
   void initState() {
     super.initState();
-    // Hiệu ứng hiện hình sau 500ms cho mượt
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) setState(() => _visible = true);
     });
@@ -70,7 +69,6 @@ class _AboutPageState extends State<AboutPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 60),
-              // Hero Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Column(
@@ -103,7 +101,6 @@ class _AboutPageState extends State<AboutPage> {
                 ),
               ),
               const SizedBox(height: 80),
-              // Section "What we believe"
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Row(
@@ -131,7 +128,6 @@ class _AboutPageState extends State<AboutPage> {
                             style: GoogleFonts.poppins(color: textWhite, fontSize: 18, height: 1.5, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 20),
-                          // Nội dung idea nhóm (BmiRecord - Câu 3)
                           Text(
                             "Height. Weight. Age. Gender. Activity Levels. BMR. TDEE. Mifflin-St Jeor. Cloud Syncing. Firebase Firestore. Real-time updates. BMI Status. Your health journey, recorded forever.",
                             style: GoogleFonts.poppins(fontSize: 15, height: 1.7, color: Colors.white70),
@@ -142,7 +138,6 @@ class _AboutPageState extends State<AboutPage> {
                             style: GoogleFonts.poppins(color: textWhite, fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 15),
-                          // Nội dung Firebase (Câu 4)
                           Text(
                             "Oh! History. Every BmiRecord is more than just a number; it's a step toward a better version of you. No local RAM limits, just pure cloud power with Firebase Firestore.",
                             style: GoogleFonts.poppins(fontSize: 15, height: 1.7, color: Colors.white38),
