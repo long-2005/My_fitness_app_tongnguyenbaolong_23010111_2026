@@ -7,6 +7,7 @@ import '../../services/nutrition_service.dart';
 import '../../user/bmi_record.dart';
 import '../../user/food_item.dart';
 import '../../user/meal_entry.dart';
+import '../../user/vitamin_goal.dart';
 
 class CaloTrackingView extends StatefulWidget {
   const CaloTrackingView({super.key});
@@ -951,8 +952,17 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                             'C',
                             '${food.carbsFor(grams).toStringAsFixed(1)} g',
                           ),
+                          if (food.fiberPer100g > 0)
+                            _macroChip(
+                              'Fiber',
+                              '${food.fiberFor(grams).toStringAsFixed(1)} g',
+                            ),
                         ],
                       ),
+                      if (food.hasMicronutrients) ...[
+                        const SizedBox(height: 14),
+                        _buildVitaminPanel(food, grams),
+                      ],
                       const SizedBox(height: 18),
                       DropdownButtonFormField<String>(
                         initialValue: selectedMeal,
@@ -1483,6 +1493,7 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                 ],
               ),
             ),
+          if (latestRecord != null) _buildVitaminDailySection(entries, latestRecord),
         ],
       ),
     );
@@ -1502,6 +1513,91 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
           height: 1.5,
           fontFamily: 'Poppins',
         ),
+      ),
+    );
+  }
+
+  Widget _buildVitaminDailySection(List<MealEntry> entries, BmiRecord record) {
+    final goal = VitaminGoal.forProfile(age: record.age, gender: record.gender);
+
+    final totalVitC = entries.fold<double>(0, (total, item) => total + item.vitaminC);
+    final totalVitA = entries.fold<double>(0, (total, item) => total + item.vitaminA);
+    final totalVitB1 = entries.fold<double>(0, (total, item) => total + item.vitaminB1);
+    final totalCalcium = entries.fold<double>(0, (total, item) => total + item.calcium);
+    final totalIron = entries.fold<double>(0, (total, item) => total + item.iron);
+    final totalFiber = entries.fold<double>(0, (total, item) => total + item.fiber);
+
+    Widget buildBar(String title, double current, double target, String unit) {
+      final percent = (current / target).clamp(0.0, 1.0);
+      Color color = Colors.redAccent;
+      if (percent >= 0.8) {
+        color = Colors.greenAccent;
+      } else if (percent >= 0.4) {
+        color = Colors.orangeAccent;
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              Text(
+                '${current.toStringAsFixed(1)} / ${target.toStringAsFixed(1)} $unit',
+                style: TextStyle(
+                  color: Colors.grey.shade400,
+                  fontSize: 11,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: percent,
+            backgroundColor: Colors.white10,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(3),
+          ),
+          const SizedBox(height: 12),
+        ],
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(top: 18),
+      decoration: _panelDecoration(alpha: 0.07, radius: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Daily Vitamins & Minerals',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 16),
+          buildBar('Vitamin C', totalVitC, goal.vitaminC, 'mg'),
+          buildBar('Vitamin A', totalVitA, goal.vitaminA, 'mcg'),
+          buildBar('Vitamin B1', totalVitB1, goal.vitaminB1, 'mg'),
+          buildBar('Calcium', totalCalcium, goal.calcium, 'mg'),
+          buildBar('Iron', totalIron, goal.iron, 'mg'),
+          buildBar('Fiber', totalFiber, goal.fiber, 'g'),
+        ],
       ),
     );
   }
@@ -1800,7 +1896,7 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
             padding: const EdgeInsets.all(18),
             decoration: _solidPanelDecoration(),
             child: const Text(
-              'Khong tim thay mon an phu hop voi tu khoa cua ban.',
+              'Can\'t find the food you\'re looking for.',
               style: TextStyle(color: Colors.white70, fontFamily: 'Poppins'),
             ),
           ),
@@ -1888,6 +1984,42 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
               _macroChip('P', '${food.proteinPer100g.toStringAsFixed(1)} g'),
               _macroChip('F', '${food.fatPer100g.toStringAsFixed(1)} g'),
               _macroChip('C', '${food.carbsPer100g.toStringAsFixed(1)} g'),
+              if (food.fiberPer100g > 0)
+                _macroChip('Fiber', '${food.fiberPer100g.toStringAsFixed(1)} g'),
+              if (food.hasMicronutrients)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.tealAccent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.tealAccent.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.local_pharmacy_rounded,
+                        size: 11,
+                        color: Colors.tealAccent,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Vitamins',
+                        style: TextStyle(
+                          color: Colors.tealAccent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -2245,6 +2377,109 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
       },
     );
   }
+
+  // Vitamin & mineral panel shown in the add-food bottom sheet.
+  Widget _buildVitaminPanel(FoodItem food, double grams) {
+    final rows = <_VitRow>[];
+    if (food.vitaminCMg > 0) {
+      rows.add(_VitRow('Vitamin C', food.vitaminCFor(grams), 'mg',
+          Icons.local_florist_rounded, Colors.greenAccent));
+    }
+    if (food.vitaminAMcg > 0) {
+      rows.add(_VitRow('Vitamin A', food.vitaminAFor(grams), 'mcg',
+          Icons.visibility_rounded, Colors.orangeAccent));
+    }
+    if (food.betaCaroteneMcg > 0) {
+      rows.add(_VitRow('β-Carotene', food.betaCaroteneMcg * grams / 100, 'mcg',
+          Icons.wb_sunny_rounded, Colors.amberAccent));
+    }
+    if (food.vitaminB1Mg > 0) {
+      rows.add(_VitRow('Vitamin B1', food.vitaminB1Mg * grams / 100, 'mg',
+          Icons.bolt_rounded, Colors.yellowAccent));
+    }
+    if (food.calciumMg > 0) {
+      rows.add(_VitRow('Calcium', food.calciumFor(grams), 'mg',
+          Icons.science_rounded, const Color(0xFF80DEEA)));
+    }
+    if (food.ironMg > 0) {
+      rows.add(_VitRow('Iron', food.ironFor(grams), 'mg',
+          Icons.water_drop_rounded, Colors.redAccent));
+    }
+    if (food.phosphorusMg > 0) {
+      rows.add(_VitRow('Phosphorus', food.phosphorusMg * grams / 100, 'mg',
+          Icons.circle_rounded, Colors.purpleAccent));
+    }
+    if (food.sodiumMg > 0) {
+      rows.add(_VitRow('Sodium', food.sodiumMg * grams / 100, 'mg',
+          Icons.grain_rounded, Colors.blueGrey));
+    }
+    if (food.potassiumMg > 0) {
+      rows.add(_VitRow('Potassium', food.potassiumMg * grams / 100, 'mg',
+          Icons.electrical_services_rounded, Colors.tealAccent));
+    }
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Vitamins & Minerals',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: rows.map((r) => _vitaminChip(r)).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _vitaminChip(_VitRow r) {
+    final valueStr = r.value < 10
+        ? r.value.toStringAsFixed(2)
+        : r.value.toStringAsFixed(1);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: r.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: r.color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(r.icon, size: 13, color: r.color),
+          const SizedBox(width: 5),
+          Text(
+            '${r.label} $valueStr ${r.unit}',
+            style: TextStyle(
+              color: r.color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DishIngredientDraft {
@@ -2303,4 +2538,13 @@ class _DishTotals {
   double get fatPer100g => totalGrams <= 0 ? 0 : totalFat / totalGrams * 100;
   double get carbsPer100g =>
       totalGrams <= 0 ? 0 : totalCarbs / totalGrams * 100;
+}
+
+class _VitRow {
+  const _VitRow(this.label, this.value, this.unit, this.icon, this.color);
+  final String label;
+  final double value;
+  final String unit;
+  final IconData icon;
+  final Color color;
 }

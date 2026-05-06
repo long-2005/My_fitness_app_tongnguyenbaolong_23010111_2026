@@ -10,6 +10,17 @@ class FoodItem {
     this.id,
     this.description,
     this.isCustom = false,
+    // Micronutrients (per 100g)
+    this.fiberPer100g = 0,
+    this.calciumMg = 0,
+    this.phosphorusMg = 0,
+    this.ironMg = 0,
+    this.sodiumMg = 0,
+    this.potassiumMg = 0,
+    this.betaCaroteneMcg = 0,
+    this.vitaminAMcg = 0,
+    this.vitaminB1Mg = 0,
+    this.vitaminCMg = 0,
   });
 
   final String? id;
@@ -23,6 +34,28 @@ class FoodItem {
   final String category;
   final bool isCustom;
 
+  // Micronutrients
+  final double fiberPer100g;
+  final double calciumMg;
+  final double phosphorusMg;
+  final double ironMg;
+  final double sodiumMg;
+  final double potassiumMg;
+  final double betaCaroteneMcg;
+  final double vitaminAMcg;
+  final double vitaminB1Mg;
+  final double vitaminCMg;
+
+  /// Returns true if this item has any micronutrient data.
+  bool get hasMicronutrients =>
+      fiberPer100g > 0 ||
+      calciumMg > 0 ||
+      ironMg > 0 ||
+      vitaminCMg > 0 ||
+      vitaminAMcg > 0 ||
+      betaCaroteneMcg > 0 ||
+      vitaminB1Mg > 0;
+
   factory FoodItem.fromDb(Map<String, Object?> map) {
     return FoodItem(
       name: map['name'] as String? ?? 'Unknown food',
@@ -32,6 +65,16 @@ class FoodItem {
       carbsPer100g: (map['carbs'] as num?)?.toDouble() ?? 0,
       searchName: map['search_name'] as String? ?? '',
       category: map['category'] as String? ?? 'Other',
+      fiberPer100g: (map['fiber'] as num?)?.toDouble() ?? 0,
+      calciumMg: (map['calcium'] as num?)?.toDouble() ?? 0,
+      phosphorusMg: (map['phosphorus'] as num?)?.toDouble() ?? 0,
+      ironMg: (map['iron'] as num?)?.toDouble() ?? 0,
+      sodiumMg: (map['sodium_mg'] as num?)?.toDouble() ?? 0,
+      potassiumMg: (map['potassium'] as num?)?.toDouble() ?? 0,
+      betaCaroteneMcg: (map['beta_carotene'] as num?)?.toDouble() ?? 0,
+      vitaminAMcg: (map['vitamin_a'] as num?)?.toDouble() ?? 0,
+      vitaminB1Mg: (map['vitamin_b1'] as num?)?.toDouble() ?? 0,
+      vitaminCMg: (map['vitamin_c'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -47,6 +90,16 @@ class FoodItem {
       searchName: map['search_name'] as String? ?? '',
       category: map['category'] as String? ?? 'Custom',
       isCustom: true,
+      fiberPer100g: (map['fiber'] as num?)?.toDouble() ?? 0,
+      calciumMg: (map['calcium'] as num?)?.toDouble() ?? 0,
+      phosphorusMg: (map['phosphorus'] as num?)?.toDouble() ?? 0,
+      ironMg: (map['iron'] as num?)?.toDouble() ?? 0,
+      sodiumMg: (map['sodium_mg'] as num?)?.toDouble() ?? 0,
+      potassiumMg: (map['potassium'] as num?)?.toDouble() ?? 0,
+      betaCaroteneMcg: (map['beta_carotene'] as num?)?.toDouble() ?? 0,
+      vitaminAMcg: (map['vitamin_a'] as num?)?.toDouble() ?? 0,
+      vitaminB1Mg: (map['vitamin_b1'] as num?)?.toDouble() ?? 0,
+      vitaminCMg: (map['vitamin_c'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -61,6 +114,16 @@ class FoodItem {
       'search_name': searchName,
       'category': category,
       'is_custom': isCustom,
+      'fiber': fiberPer100g,
+      'calcium': calciumMg,
+      'phosphorus': phosphorusMg,
+      'iron': ironMg,
+      'sodium_mg': sodiumMg,
+      'potassium': potassiumMg,
+      'beta_carotene': betaCaroteneMcg,
+      'vitamin_a': vitaminAMcg,
+      'vitamin_b1': vitaminB1Mg,
+      'vitamin_c': vitaminCMg,
     };
   }
 
@@ -75,6 +138,16 @@ class FoodItem {
     String? searchName,
     String? category,
     bool? isCustom,
+    double? fiberPer100g,
+    double? calciumMg,
+    double? phosphorusMg,
+    double? ironMg,
+    double? sodiumMg,
+    double? potassiumMg,
+    double? betaCaroteneMcg,
+    double? vitaminAMcg,
+    double? vitaminB1Mg,
+    double? vitaminCMg,
   }) {
     return FoodItem(
       id: id ?? this.id,
@@ -87,6 +160,16 @@ class FoodItem {
       searchName: searchName ?? this.searchName,
       category: category ?? this.category,
       isCustom: isCustom ?? this.isCustom,
+      fiberPer100g: fiberPer100g ?? this.fiberPer100g,
+      calciumMg: calciumMg ?? this.calciumMg,
+      phosphorusMg: phosphorusMg ?? this.phosphorusMg,
+      ironMg: ironMg ?? this.ironMg,
+      sodiumMg: sodiumMg ?? this.sodiumMg,
+      potassiumMg: potassiumMg ?? this.potassiumMg,
+      betaCaroteneMcg: betaCaroteneMcg ?? this.betaCaroteneMcg,
+      vitaminAMcg: vitaminAMcg ?? this.vitaminAMcg,
+      vitaminB1Mg: vitaminB1Mg ?? this.vitaminB1Mg,
+      vitaminCMg: vitaminCMg ?? this.vitaminCMg,
     );
   }
 
@@ -94,4 +177,10 @@ class FoodItem {
   double proteinFor(double grams) => proteinPer100g * grams / 100;
   double fatFor(double grams) => fatPer100g * grams / 100;
   double carbsFor(double grams) => carbsPer100g * grams / 100;
+  double fiberFor(double grams) => fiberPer100g * grams / 100;
+  double vitaminCFor(double grams) => vitaminCMg * grams / 100;
+  double vitaminAFor(double grams) => vitaminAMcg * grams / 100;
+  double vitaminB1For(double grams) => vitaminB1Mg * grams / 100;
+  double calciumFor(double grams) => calciumMg * grams / 100;
+  double ironFor(double grams) => ironMg * grams / 100;
 }

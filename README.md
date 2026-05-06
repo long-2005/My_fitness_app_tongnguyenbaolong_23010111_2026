@@ -31,3 +31,14 @@ Trong bài, danh sách `BmiRecord` không được lưu local trong RAM mà lưu
 **Cơ chế Update hiện tại:** Người dùng nhập lại input → nhấn *Calculate & Save* → tạo bản ghi mới lưu vào Firestore.
 
 Đây là thiết kế hợp lý cho ứng dụng health tracking: mỗi lần đo là một bản ghi mới, không ghi đè lịch sử cũ.
+----------------------------------------------------------------------------------------
+
+thêm database cho trang calo tracking 
+hoàn thiện chức năng calo tracking  
+ui/ux cho calo tracking
+------------------------------------------------------------------------------------------------------------
+bài giữa kì
+Long làm trang sign in sign up 
+phat làm about 
+dùng font chữ đã có sẵn trong assets/fonts từ trước
+ui làm đồng bộ và đẹp

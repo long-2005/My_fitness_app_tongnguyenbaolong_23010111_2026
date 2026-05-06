@@ -6,6 +6,7 @@ import '../../services/bmi_service.dart';
 import '../../services/nutrition_service.dart';
 import '../../user/bmi_record.dart';
 import '../../user/meal_entry.dart';
+import '../../user/vitamin_goal.dart';
 import 'bmi_view.dart';
 import 'calo_tracking_view.dart';
 import 'exercise_library_view.dart';
@@ -610,6 +611,10 @@ class _HomeViewState extends State<HomeView> {
                         ),
                       ),
                     ],
+                    if (latestRecord != null) ...[
+                      const SizedBox(height: 16),
+                      _buildVitaminCompactPills(entries, latestRecord),
+                    ],
                     const SizedBox(height: 16),
                     ...entries.take(4).map(_buildMealPreviewChip),
                   ],
@@ -634,6 +639,87 @@ class _HomeViewState extends State<HomeView> {
           _selectedIndex = 1;
         });
       },
+    );
+  }
+
+  Widget _buildVitaminCompactPills(List<MealEntry> entries, BmiRecord record) {
+    final goal = VitaminGoal.forProfile(age: record.age, gender: record.gender);
+
+    final totalVitC = entries.fold<double>(0, (total, item) => total + item.vitaminC);
+    final totalVitA = entries.fold<double>(0, (total, item) => total + item.vitaminA);
+    final totalVitB1 = entries.fold<double>(0, (total, item) => total + item.vitaminB1);
+    final totalCalcium = entries.fold<double>(0, (total, item) => total + item.calcium);
+    final totalIron = entries.fold<double>(0, (total, item) => total + item.iron);
+    final totalFiber = entries.fold<double>(0, (total, item) => total + item.fiber);
+
+    Widget pill(String label, double current, double target) {
+      final percent = (current / target).clamp(0.0, 1.0);
+      Color color = Colors.redAccent;
+      if (percent >= 0.8) {
+        color = Colors.greenAccent;
+      } else if (percent >= 0.4) {
+        color = Colors.orangeAccent;
+      }
+
+      return Container(
+        margin: const EdgeInsets.only(right: 8, bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${(percent * 100).toInt()}%',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Daily Vitamins',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          children: [
+            pill('Vit C', totalVitC, goal.vitaminC),
+            pill('Vit A', totalVitA, goal.vitaminA),
+            pill('Vit B1', totalVitB1, goal.vitaminB1),
+            pill('Ca', totalCalcium, goal.calcium),
+            pill('Fe', totalIron, goal.iron),
+            pill('Fiber', totalFiber, goal.fiber),
+          ],
+        ),
+      ],
     );
   }
 
