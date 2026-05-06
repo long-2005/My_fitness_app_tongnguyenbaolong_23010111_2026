@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 void main() {
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -7,8 +8,24 @@ void main() {
   ));
 }
 
-class AboutPage extends StatelessWidget {
+class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
+
+  @override
+  State<AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends State<AboutPage> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Hiệu ứng hiện hình sau 500ms cho mượt
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _visible = true);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,116 +47,115 @@ class AboutPage extends StatelessWidget {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () {},
-            child: Text('GUIDE', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
-          ),
+          TextButton(onPressed: () {}, child: const Text('GUIDE', style: TextStyle(color: Colors.white70, fontSize: 12))),
+          const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentRed,
-                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
               ),
               onPressed: () {},
-              child: Text('PROFILE', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold)),
+              child: const Text('PROFILE', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 60),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                children: [
-                  Text(
-                    "We're trainers, analysts, and keepers of your body health.",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      color: textWhite,
-                      fontSize: 38,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentRed,
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                      shape: const BeveledRectangleBorder(),
-                    ),
-                    onPressed: () {},
-                    child: Text(
-                      'CHECK YOUR BMI NOW',
+      body: AnimatedOpacity(
+        opacity: _visible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 1000),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 60),
+              // Hero Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  children: [
+                    Text(
+                      "We're trainers, analysts, and keepers of your body health.",
+                      textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.1,
+                        color: textWhite,
+                        fontSize: 38,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 80),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 1,
-                    child: Text(
-                      "WHAT WE BELIEVE",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13,
-                        letterSpacing: 1.2,
-                        color: accentRed,
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentRed,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                        shape: const BeveledRectangleBorder(),
+                      ),
+                      onPressed: () {},
+                      child: Text(
+                        'CHECK YOUR BMI NOW',
+                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.1),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "We believe in data. Precise data. Parameters like:",
-                          style: GoogleFonts.poppins(color: textWhite, fontSize: 18, height: 1.5, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          "Height. Weight. Age. Gender. Activity Levels. BMR. TDEE. Mifflin-St Jeor. Cloud Syncing. Firebase Firestore. Real-time updates. BMI Status. Underweight. Normal. Overweight. Obese. Your health journey, recorded forever.",
-                          style: GoogleFonts.poppins(fontSize: 15, height: 1.7, color: Colors.white70),
-                        ),
-                        const SizedBox(height: 30),
-                        Text(
-                          "What are we forgetting?",
-                          style: GoogleFonts.poppins(color: textWhite, fontSize: 18, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          "Oh! History. Every BmiRecord is more than just a number; it's a step toward a better version of you. No local RAM limits, just pure cloud power with Firebase Firestore.",
-                          style: GoogleFonts.poppins(fontSize: 15, height: 1.7, color: Colors.white38),
-                        ),
-                        const SizedBox(height: 60),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 80),
+              // Section "What we believe"
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        "WHAT WE BELIEVE",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          letterSpacing: 1.2,
+                          color: accentRed,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "We believe in data. Precise data. Parameters like:",
+                            style: GoogleFonts.poppins(color: textWhite, fontSize: 18, height: 1.5, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 20),
+                          // Nội dung idea nhóm (BmiRecord - Câu 3)
+                          Text(
+                            "Height. Weight. Age. Gender. Activity Levels. BMR. TDEE. Mifflin-St Jeor. Cloud Syncing. Firebase Firestore. Real-time updates. BMI Status. Your health journey, recorded forever.",
+                            style: GoogleFonts.poppins(fontSize: 15, height: 1.7, color: Colors.white70),
+                          ),
+                          const SizedBox(height: 30),
+                          Text(
+                            "What are we forgetting?",
+                            style: GoogleFonts.poppins(color: textWhite, fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 15),
+                          // Nội dung Firebase (Câu 4)
+                          Text(
+                            "Oh! History. Every BmiRecord is more than just a number; it's a step toward a better version of you. No local RAM limits, just pure cloud power with Firebase Firestore.",
+                            style: GoogleFonts.poppins(fontSize: 15, height: 1.7, color: Colors.white38),
+                          ),
+                          const SizedBox(height: 60),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
