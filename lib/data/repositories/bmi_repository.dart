@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 //  SERVICE: BmiService
 //  Chịu trách nhiệm giao tiếp với Firebase Firestore.
 //  Tách biệt hoàn toàn logic lưu/đọc dữ liệu khỏi UI.
@@ -6,7 +6,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../user/bmi_record.dart';
+import 'package:flutter_application_1/data/models/bmi_record.dart';
 
 class BmiService {
   // ── Firebase instances ─────────────────────────────────────

@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_application_1/view/widgets/Ui.dart';
+import 'package:flutter_application_1/data/repositories/language_repository.dart';
+import 'package:flutter_application_1/l10n/app_strings.dart';
+import 'package:flutter_application_1/presentation/widgets/ui_background.dart';
 
 class SignUpView extends StatefulWidget {
   const SignUpView({super.key});
@@ -51,6 +53,25 @@ class _SignUpViewState extends State<SignUpView> {
     );
   }
 
+  String _getFriendlyAuthError(String code) {
+    switch (code) {
+      case 'email-already-in-use':
+        return 'Email này đã được đăng ký. Vui lòng đăng nhập hoặc dùng email khác.';
+      case 'invalid-email':
+        return 'Địa chỉ email không hợp lệ.';
+      case 'weak-password':
+        return 'Mật khẩu quá yếu. Vui lòng dùng ít nhất 6 ký tự.';
+      case 'operation-not-allowed':
+        return 'Phương thức đăng ký này chưa được hỗ trợ.';
+      case 'network-request-failed':
+        return 'Không có kết nối mạng. Vui lòng kiểm tra Wi-Fi hoặc dữ liệu di động.';
+      case 'too-many-requests':
+        return 'Quá nhiều lần thử. Vui lòng chờ vài phút rồi thử lại.';
+      default:
+        return 'Đã xảy ra lỗi. Vui lòng thử lại sau.';
+    }
+  }
+
   Future<void> _handleSignUp() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
@@ -74,6 +95,7 @@ class _SignUpViewState extends State<SignUpView> {
         'fullName': name,
         'email': email,
         'createdAt': DateTime.now(),
+        'languageCode': LanguageService().languageCode,
         'role': 'user',
       });
 
@@ -85,15 +107,25 @@ class _SignUpViewState extends State<SignUpView> {
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       _showSnackBar(
-        e.message ?? 'Registration failed',
+        _getFriendlyAuthError(e.code),
         backgroundColor: Colors.redAccent,
       );
     } catch (e) {
       debugPrint('System Error: $e');
-      _showSnackBar(
-        'System error occurred during registration',
-        backgroundColor: Colors.redAccent,
-      );
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('network') ||
+          msg.contains('socket') ||
+          msg.contains('timeout')) {
+        _showSnackBar(
+          'No internet connection. Please check your Wi-Fi or mobile data.',
+          backgroundColor: Colors.redAccent,
+        );
+      } else {
+        _showSnackBar(
+          'A system error occurred. Please try again later.',
+          backgroundColor: Colors.redAccent,
+        );
+      }
     } finally {
       _setLoading(false);
     }
@@ -153,8 +185,9 @@ class _SignUpViewState extends State<SignUpView> {
   }
 
   Widget _buildHeader() {
+    final s = AppStrings.of(context);
     return Text(
-      'Create Account',
+      s.createAccount,
       style: const TextStyle(
         fontFamily: 'Poppins',
         fontSize: 30,
@@ -166,6 +199,7 @@ class _SignUpViewState extends State<SignUpView> {
   }
 
   Widget _buildSignUpCard() {
+    final s = AppStrings.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -186,30 +220,30 @@ class _SignUpViewState extends State<SignUpView> {
           children: [
             _buildTextField(
               controller: _nameController,
-              label: 'Full Name',
+              label: s.fullName,
               icon: Icons.person_outline,
               textInputAction: TextInputAction.next,
               autofillHints: const [AutofillHints.name],
               validator: (value) {
                 final name = value?.trim() ?? '';
-                if (name.isEmpty) return 'Please enter your full name';
-                if (name.length < 2) return 'Name is too short';
+                if (name.isEmpty) return s.pleaseEnterName;
+                if (name.length < 2) return s.nameTooShort;
                 return null;
               },
             ),
             const SizedBox(height: 15),
             _buildTextField(
               controller: _emailController,
-              label: 'Email',
+              label: s.email,
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autofillHints: const [AutofillHints.email],
               validator: (value) {
                 final email = value?.trim() ?? '';
-                if (email.isEmpty) return 'Please enter your email';
+                if (email.isEmpty) return s.pleaseEnterEmail;
                 if (!email.contains('@') || !email.contains('.')) {
-                  return 'Please enter a valid email';
+                  return s.invalidEmail;
                 }
                 return null;
               },
@@ -217,39 +251,32 @@ class _SignUpViewState extends State<SignUpView> {
             const SizedBox(height: 15),
             _buildPasswordField(
               controller: _passwordController,
-              label: 'Password',
+              label: s.password,
               isObscure: _isObscure,
               onToggle: () => setState(() => _isObscure = !_isObscure),
               validator: (value) {
                 final password = value?.trim() ?? '';
-                if (password.isEmpty) return 'Please enter your password';
-                if (password.length < 6) {
-                  return 'Password must be at least 6 characters';
-                }
+                if (password.isEmpty) return s.pleaseEnterPassword;
+                if (password.length < 6) return s.passwordTooShort;
                 return null;
               },
             ),
             const SizedBox(height: 15),
             _buildPasswordField(
               controller: _confirmPasswordController,
-              label: 'Confirm Password',
+              label: s.confirmPassword,
               isObscure: _isObscureConfirm,
-              onToggle: () => setState(
-                () => _isObscureConfirm = !_isObscureConfirm,
-              ),
+              onToggle: () =>
+                  setState(() => _isObscureConfirm = !_isObscureConfirm),
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) {
-                if (!_isLoading) {
-                  _handleSignUp();
-                }
+                if (!_isLoading) _handleSignUp();
               },
               validator: (value) {
                 final confirmPassword = value?.trim() ?? '';
-                if (confirmPassword.isEmpty) {
-                  return 'Please confirm your password';
-                }
+                if (confirmPassword.isEmpty) return s.pleaseConfirmPassword;
                 if (confirmPassword != _passwordController.text.trim()) {
-                  return 'Passwords do not match';
+                  return s.passwordsDoNotMatch;
                 }
                 return null;
               },
@@ -281,9 +308,9 @@ class _SignUpViewState extends State<SignUpView> {
                           strokeWidth: 3,
                         ),
                       )
-                    : const Text(
-                        'SIGN UP',
-                        style: TextStyle(
+                    : Text(
+                        s.signUp.toUpperCase(),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),

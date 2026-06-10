@@ -2,12 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../services/bmi_service.dart';
-import '../../services/nutrition_service.dart';
-import '../../user/bmi_record.dart';
-import '../../user/food_item.dart';
-import '../../user/meal_entry.dart';
-import '../../user/vitamin_goal.dart';
+import 'package:flutter_application_1/data/repositories/bmi_repository.dart';
+import 'package:flutter_application_1/data/repositories/nutrition_repository.dart';
+import 'package:flutter_application_1/data/models/bmi_record.dart';
+import 'package:flutter_application_1/data/models/food_item.dart';
+import 'package:flutter_application_1/data/models/meal_entry.dart';
+import 'package:flutter_application_1/data/models/vitamin_goal.dart';
+import 'package:flutter_application_1/presentation/widgets/ui.dart' as ui;
 
 class CaloTrackingView extends StatefulWidget {
   const CaloTrackingView({super.key});
@@ -20,10 +21,6 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
   static const _accent = Color(0xFFE16D6D);
   static const _accentDeep = Color(0xFF8D1A1A);
   static const _surface = Color(0xFF171717);
-  static const _panelBorder = Colors.white10;
-  static const _panelShadow = [
-    BoxShadow(color: Colors.black45, blurRadius: 20, offset: Offset(0, 10)),
-  ];
 
   final NutritionService _nutritionService = NutritionService.instance;
   final BmiService _bmiService = BmiService();
@@ -33,6 +30,8 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
   bool _isSearching = false;
   bool _hasSearched = false;
   String _selectedCategory = 'All';
+  bool _showMoreNote = false;
+  int _selectedWeekday = DateTime.now().weekday % 7;
 
   @override
   void initState() {
@@ -256,15 +255,7 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          Text(
-                            'Ingredients',
-                            style: TextStyle(
-                              color: Colors.grey.shade300,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
+                          const ui.SectionLabel('Ingredients'),
                           const SizedBox(height: 10),
                           if (ingredients.isEmpty)
                             Container(
@@ -363,23 +354,23 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                                   spacing: 10,
                                   runSpacing: 10,
                                   children: [
-                                    _macroChip(
+                                    ui.MacroChip(
                                       'Weight',
                                       '${totals.totalGrams.toStringAsFixed(0)} g',
                                     ),
-                                    _macroChip(
+                                    ui.MacroChip(
                                       'Cal',
                                       '${totals.totalCalories.toStringAsFixed(0)} kcal',
                                     ),
-                                    _macroChip(
+                                    ui.MacroChip(
                                       'P',
                                       '${totals.totalProtein.toStringAsFixed(1)} g',
                                     ),
-                                    _macroChip(
+                                    ui.MacroChip(
                                       'F',
                                       '${totals.totalFat.toStringAsFixed(1)} g',
                                     ),
-                                    _macroChip(
+                                    ui.MacroChip(
                                       'C',
                                       '${totals.totalCarbs.toStringAsFixed(1)} g',
                                     ),
@@ -936,24 +927,24 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                         spacing: 10,
                         runSpacing: 10,
                         children: [
-                          _macroChip(
+                          ui.MacroChip(
                             'Cal',
                             '${food.caloriesFor(grams).toStringAsFixed(0)} kcal',
                           ),
-                          _macroChip(
+                          ui.MacroChip(
                             'P',
                             '${food.proteinFor(grams).toStringAsFixed(1)} g',
                           ),
-                          _macroChip(
+                          ui.MacroChip(
                             'F',
                             '${food.fatFor(grams).toStringAsFixed(1)} g',
                           ),
-                          _macroChip(
+                          ui.MacroChip(
                             'C',
                             '${food.carbsFor(grams).toStringAsFixed(1)} g',
                           ),
                           if (food.fiberPer100g > 0)
-                            _macroChip(
+                            ui.MacroChip(
                               'Fiber',
                               '${food.fiberFor(grams).toStringAsFixed(1)} g',
                             ),
@@ -1158,27 +1149,20 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text(
-          'Calo Tracking',
+        title: Text(
+          'Calo Track',
           style: TextStyle(
             color: Color.fromARGB(255, 215, 215, 215),
             fontWeight: FontWeight.w800,
+            fontSize: 20,
             fontFamily: 'Poppins',
           ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF0F0F0F),
         surfaceTintColor: Colors.transparent,
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _accentDeep,
-        foregroundColor: Colors.white,
-        onPressed: _showCreateFoodDialog,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'Create dish',
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
-        ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
       ),
       body: mealStream == null
           ? _buildNotSignedIn()
@@ -1206,6 +1190,8 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                               ),
                               child: Column(
                                 children: [
+                                  _buildWeekSelector(),
+                                  const SizedBox(height: 16),
                                   _buildSummaryCard(entries, latestRecord),
                                   const SizedBox(height: 18),
                                   _buildSearchCard(),
@@ -1224,13 +1210,8 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
-                                    Icons.restaurant_rounded,
-                                    color: _accent,
-                                  ),
-                                  const SizedBox(width: 8),
                                   Text(
-                                    'Today\'s menu',
+                                    'Diary',
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleMedium
@@ -1288,6 +1269,76 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
   }
 
   // Khối tổng quan calories, macros và độ lệch so với TDEE.
+  Widget _buildWeekSelector() {
+    const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: _panelDecoration(alpha: 0.06, radius: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Today',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: List.generate(labels.length, (index) {
+              final selected = _selectedWeekday == index;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _selectedWeekday = index),
+                  borderRadius: BorderRadius.circular(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        labels[index],
+                        style: TextStyle(
+                          color: selected ? Colors.white : Colors.white60,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: selected ? _accent : Colors.transparent,
+                          border: Border.all(
+                            color: selected ? _accent : Colors.white54,
+                          ),
+                        ),
+                        child: selected
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: Colors.black,
+                                size: 13,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSummaryCard(List<MealEntry> entries, BmiRecord? latestRecord) {
     final totalCalories = entries.fold<double>(
       0,
@@ -1302,6 +1353,8 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
       0,
       (total, item) => total + item.carbs,
     );
+    final calorieGoal = latestRecord?.tdee.toDouble() ?? 2930.0;
+    final caloriesLeft = calorieGoal - totalCalories;
     final balance = latestRecord == null
         ? null
         : totalCalories - latestRecord.tdee;
@@ -1310,116 +1363,118 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: _heroDecoration(),
+      padding: EdgeInsets.zero,
+      decoration: const BoxDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: _panelDecoration(alpha: 0.08, radius: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Calories',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: const Text(
-                        'Daily nutrition dashboard',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
                     Text(
-                      '${totalCalories.toStringAsFixed(0)} kcal consumed',
+                      '${totalCalories.toStringAsFixed(0)} cal',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 28,
+                        fontSize: 24,
                         fontWeight: FontWeight.w800,
                         fontFamily: 'Poppins',
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(width: 6),
                     Text(
-                      entries.isEmpty
-                          ? 'Start by searching food below or create your own dish.'
-                          : '${entries.length} item(s) logged today across your meal plan.',
+                      '/ ${calorieGoal.toStringAsFixed(0)}',
                       style: TextStyle(
                         color: Colors.grey.shade300,
-                        fontSize: 13,
-                        height: 1.5,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      caloriesLeft >= 0
+                          ? '${caloriesLeft.toStringAsFixed(0)} left'
+                          : '${caloriesLeft.abs().toStringAsFixed(0)} over',
+                      style: TextStyle(
+                        color: caloriesLeft >= 0 ? Colors.white70 : _accent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         fontFamily: 'Poppins',
                       ),
                     ),
                   ],
                 ),
-              ),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF09A45), Color(0xFFE16D6D)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                const SizedBox(height: 12),
+                _CyberpunkProgressBar(
+                  value: (totalCalories / calorieGoal).clamp(0.0, 1.0),
+                  color: _accent,
+                  trackColor: Colors.white.withValues(alpha: 0.12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: _panelDecoration(alpha: 0.08, radius: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _macroMeter(
+                    'Carbs',
+                    totalCarbs,
+                    latestRecord == null ? 356 : calorieGoal * 0.5 / 4,
+                    Colors.tealAccent,
+                    'g',
                   ),
                 ),
-                child: const Icon(
-                  Icons.local_fire_department_rounded,
-                  color: Colors.white,
-                  size: 34,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _macroMeter(
+                    'Fat',
+                    totalFat,
+                    latestRecord == null ? 98 : calorieGoal * 0.3 / 9,
+                    Colors.purpleAccent,
+                    'g',
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _macroMeter(
+                    'Protein',
+                    totalProtein,
+                    latestRecord == null ? 146 : calorieGoal * 0.2 / 4,
+                    Colors.orangeAccent,
+                    'g',
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _summaryStat(
-                  'Protein',
-                  '${totalProtein.toStringAsFixed(1)} g',
-                  Colors.lightBlueAccent,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _summaryStat(
-                  'Fat',
-                  '${totalFat.toStringAsFixed(1)} g',
-                  Colors.orangeAccent,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _summaryStat(
-                  'Carbs',
-                  '${totalCarbs.toStringAsFixed(1)} g',
-                  Colors.greenAccent,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          if (latestRecord == null)
-            _buildTdeeMissingCard()
-          else
+          if (latestRecord != null) ...[
+            const SizedBox(height: 8),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: _panelDecoration(alpha: 0.07, radius: 20),
+              padding: const EdgeInsets.all(14),
+              decoration: _panelDecoration(alpha: 0.06, radius: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1427,10 +1482,10 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Compared with your TDEE ${latestRecord.tdee} kcal/day',
+                          'TDEE ${latestRecord.tdee} kcal/day',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 15,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             fontFamily: 'Poppins',
                           ),
@@ -1480,20 +1535,28 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _goalSummary(balance, weeklyKgChange),
-                    style: TextStyle(
-                      color: Colors.grey.shade300,
-                      fontSize: 12,
-                      height: 1.5,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
                 ],
               ),
             ),
-          if (latestRecord != null) _buildVitaminDailySection(entries, latestRecord),
+          ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => setState(() => _showMoreNote = !_showMoreNote),
+              child: Text(
+                _showMoreNote ? 'Hide note' : 'More note',
+                style: const TextStyle(
+                  color: _accent,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+          ),
+          if (_showMoreNote && latestRecord != null)
+            _buildVitaminDailySection(entries, latestRecord),
+          if (_showMoreNote && latestRecord == null) _buildTdeeMissingCard(),
         ],
       ),
     );
@@ -1520,12 +1583,30 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
   Widget _buildVitaminDailySection(List<MealEntry> entries, BmiRecord record) {
     final goal = VitaminGoal.forProfile(age: record.age, gender: record.gender);
 
-    final totalVitC = entries.fold<double>(0, (total, item) => total + item.vitaminC);
-    final totalVitA = entries.fold<double>(0, (total, item) => total + item.vitaminA);
-    final totalVitB1 = entries.fold<double>(0, (total, item) => total + item.vitaminB1);
-    final totalCalcium = entries.fold<double>(0, (total, item) => total + item.calcium);
-    final totalIron = entries.fold<double>(0, (total, item) => total + item.iron);
-    final totalFiber = entries.fold<double>(0, (total, item) => total + item.fiber);
+    final totalVitC = entries.fold<double>(
+      0,
+      (total, item) => total + item.vitaminC,
+    );
+    final totalVitA = entries.fold<double>(
+      0,
+      (total, item) => total + item.vitaminA,
+    );
+    final totalVitB1 = entries.fold<double>(
+      0,
+      (total, item) => total + item.vitaminB1,
+    );
+    final totalCalcium = entries.fold<double>(
+      0,
+      (total, item) => total + item.calcium,
+    );
+    final totalIron = entries.fold<double>(
+      0,
+      (total, item) => total + item.iron,
+    );
+    final totalFiber = entries.fold<double>(
+      0,
+      (total, item) => total + item.fiber,
+    );
 
     Widget buildBar(String title, double current, double target, String unit) {
       final percent = (current / target).clamp(0.0, 1.0);
@@ -1561,12 +1642,10 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
             ],
           ),
           const SizedBox(height: 6),
-          LinearProgressIndicator(
+          _CyberpunkProgressBar(
             value: percent,
-            backgroundColor: Colors.white10,
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 6,
-            borderRadius: BorderRadius.circular(3),
+            color: color,
+            trackColor: Colors.white.withValues(alpha: 0.10),
           ),
           const SizedBox(height: 12),
         ],
@@ -1577,12 +1656,12 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       margin: const EdgeInsets.only(top: 18),
-      decoration: _panelDecoration(alpha: 0.07, radius: 20),
+      decoration: _panelDecoration(alpha: 0.07, radius: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Daily Vitamins & Minerals',
+            'Vitamins & minerals',
             style: TextStyle(
               color: Colors.white,
               fontSize: 15,
@@ -1613,11 +1692,8 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
             controller: _searchController,
             style: const TextStyle(color: Colors.white, fontFamily: 'Poppins'),
             textInputAction: TextInputAction.search,
-            decoration:
-                _inputDecoration(
-                  'Search food',
-                  Icons.search_rounded,
-                ).copyWith(
+            decoration: _inputDecoration('Search food', Icons.search_rounded)
+                .copyWith(
                   suffixIconConstraints: const BoxConstraints(
                     minWidth: 0,
                     minHeight: 0,
@@ -1977,15 +2053,15 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
             spacing: 10,
             runSpacing: 8,
             children: [
-              _macroChip(
-                '100g',
-                '${food.caloriesPer100g.toStringAsFixed(0)} kcal',
-              ),
+              _macroChip('100g', '${food.caloriesPer100g.toStringAsFixed(0)} kcal'),
               _macroChip('P', '${food.proteinPer100g.toStringAsFixed(1)} g'),
               _macroChip('F', '${food.fatPer100g.toStringAsFixed(1)} g'),
               _macroChip('C', '${food.carbsPer100g.toStringAsFixed(1)} g'),
               if (food.fiberPer100g > 0)
-                _macroChip('Fiber', '${food.fiberPer100g.toStringAsFixed(1)} g'),
+                _macroChip(
+                  'Fiber',
+                  '${food.fiberPer100g.toStringAsFixed(1)} g',
+                ),
               if (food.hasMicronutrients)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -2100,11 +2176,11 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _macroChip('Amount', '${entry.grams.toStringAsFixed(0)} g'),
-              _macroChip('Cal', '${entry.calories.toStringAsFixed(0)} kcal'),
-              _macroChip('P', '${entry.protein.toStringAsFixed(1)} g'),
-              _macroChip('F', '${entry.fat.toStringAsFixed(1)} g'),
-              _macroChip('C', '${entry.carbs.toStringAsFixed(1)} g'),
+              ui.MacroChip('Amount', '${entry.grams.toStringAsFixed(0)} g'),
+              ui.MacroChip('Cal', '${entry.calories.toStringAsFixed(0)} kcal'),
+              ui.MacroChip('P', '${entry.protein.toStringAsFixed(1)} g'),
+              ui.MacroChip('F', '${entry.fat.toStringAsFixed(1)} g'),
+              ui.MacroChip('C', '${entry.carbs.toStringAsFixed(1)} g'),
             ],
           ),
         ],
@@ -2168,6 +2244,65 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
     );
   }
 
+  Widget _macroMeter(
+    String title,
+    double current,
+    double target,
+    Color color,
+    String unit,
+  ) {
+    final safeTarget = target <= 0 ? 1.0 : target;
+    final value = (current / safeTarget).clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        const SizedBox(height: 4),
+        RichText(
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          text: TextSpan(
+            style: const TextStyle(fontFamily: 'Poppins'),
+            children: [
+              TextSpan(
+                text: current.toStringAsFixed(0),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              TextSpan(
+                text: ' $unit / ${safeTarget.toStringAsFixed(0)}',
+                style: TextStyle(
+                  color: Colors.grey.shade400,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        _CyberpunkProgressBar(
+          value: value,
+          color: color,
+          trackColor: Colors.white.withValues(alpha: 0.12),
+          height: 6,
+        ),
+      ],
+    );
+  }
+
   Color _balanceColor(double? balance) {
     if (balance == null) {
       return Colors.grey;
@@ -2199,68 +2334,25 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
     return '$sign${weeklyKgChange.abs().toStringAsFixed(2)} kg/week';
   }
 
-  String _goalSummary(double balance, double weeklyKgChange) {
-    if (balance <= -150) {
-      return 'You are under TDEE by about ${balance.abs().toStringAsFixed(0)} kcal today, equivalent to roughly ${weeklyKgChange.abs().toStringAsFixed(2)} kg loss per week if maintained.';
-    }
-    if (balance >= 150) {
-      return 'You are above TDEE by about ${balance.abs().toStringAsFixed(0)} kcal today, equivalent to roughly ${weeklyKgChange.abs().toStringAsFixed(2)} kg gain per week if maintained.';
-    }
-    return 'Your intake is close to maintenance today, so your weight trend should stay relatively stable if this pattern continues.';
-  }
-
-  // Style nút viền dùng lại cho các thao tác phụ trong dialog/bottom sheet.
+  // Style nút viền — delegate sang ui.outlineButtonStyle()
   ButtonStyle _outlineButtonStyle({
     double radius = 14,
     EdgeInsetsGeometry? padding,
-  }) => OutlinedButton.styleFrom(
-    foregroundColor: Colors.white,
-    side: const BorderSide(color: Colors.white24),
-    padding: padding,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
-  );
+  }) => ui.outlineButtonStyle(radius: radius, padding: padding);
 
-  // Style panel nền mờ dùng chung cho card và empty state.
+  // Style panel nền mờ — delegate sang ui.panelDecoration()
   BoxDecoration _panelDecoration({
     double alpha = 0.06,
     double radius = 18,
     bool hasShadow = false,
-  }) => BoxDecoration(
-    color: Colors.white.withValues(alpha: alpha),
-    borderRadius: BorderRadius.circular(radius),
-    border: Border.all(color: _panelBorder),
-    boxShadow: hasShadow ? _panelShadow : null,
-  );
+  }) => ui.panelDecoration(alpha: alpha, radius: radius, hasShadow: hasShadow);
 
-  // Style panel nền đặc dùng cho khối gợi ý tìm kiếm.
+  // Style panel nền đặc — delegate sang ui.solidPanelDecoration()
   BoxDecoration _solidPanelDecoration({bool hasShadow = false}) =>
-      BoxDecoration(
-        color: const Color(0xFF121212),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _panelBorder),
-        boxShadow: hasShadow
-            ? const [
-                BoxShadow(
-                  color: Colors.black38,
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
-                ),
-              ]
-            : null,
-      );
+      ui.solidPanelDecoration(hasShadow: hasShadow);
+
 
   // Style khối hero gradient ở đầu màn hình theo dõi calories.
-  BoxDecoration _heroDecoration() => BoxDecoration(
-    borderRadius: BorderRadius.circular(28),
-    gradient: const LinearGradient(
-      colors: [Color(0xFF591717), Color(0xFF231313), Color(0xFF121212)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    ),
-    border: Border.all(color: Colors.white12),
-    boxShadow: _panelShadow,
-  );
-
   Widget _gramButton({required String label, required VoidCallback onTap}) {
     return OutlinedButton(
       onPressed: onTap,
@@ -2277,67 +2369,18 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
     );
   }
 
-  Widget _macroChip(String title, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Text(
-        '$title  $value',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          fontFamily: 'Poppins',
-        ),
-      ),
-    );
-  }
+  // _macroChip delegate sang ui.MacroChip
+  Widget _macroChip(String title, String value) => ui.MacroChip(title, value);
 
-  Widget _buildSectionLabel(String label) {
-    return Text(
-      label,
-      style: TextStyle(
-        color: Colors.grey.shade300,
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        fontFamily: 'Poppins',
-      ),
-    );
-  }
+  // _buildSectionLabel delegate sang ui.SectionLabel
+  Widget _buildSectionLabel(String label) => ui.SectionLabel(label);
 
+  // _inputDecoration delegate sang ui.inputDecoration()
   InputDecoration _inputDecoration(
     String label,
     IconData icon, {
     String? hintText,
-  }) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hintText,
-      floatingLabelBehavior: FloatingLabelBehavior.always,
-      labelStyle: const TextStyle(color: Colors.white70, fontFamily: 'Poppins'),
-      hintStyle: const TextStyle(color: Colors.white38, fontFamily: 'Poppins'),
-      prefixIcon: Icon(icon, color: _accent),
-      filled: true,
-      fillColor: Colors.black26,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.white24),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: _accent),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-    );
-  }
+  }) => ui.inputDecoration(label, icon, hintText: hintText);
 
   Widget _buildDialogField(
     TextEditingController controller,
@@ -2382,40 +2425,103 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
   Widget _buildVitaminPanel(FoodItem food, double grams) {
     final rows = <_VitRow>[];
     if (food.vitaminCMg > 0) {
-      rows.add(_VitRow('Vitamin C', food.vitaminCFor(grams), 'mg',
-          Icons.local_florist_rounded, Colors.greenAccent));
+      rows.add(
+        _VitRow(
+          'Vitamin C',
+          food.vitaminCFor(grams),
+          'mg',
+          Icons.local_florist_rounded,
+          Colors.greenAccent,
+        ),
+      );
     }
     if (food.vitaminAMcg > 0) {
-      rows.add(_VitRow('Vitamin A', food.vitaminAFor(grams), 'mcg',
-          Icons.visibility_rounded, Colors.orangeAccent));
+      rows.add(
+        _VitRow(
+          'Vitamin A',
+          food.vitaminAFor(grams),
+          'mcg',
+          Icons.visibility_rounded,
+          Colors.orangeAccent,
+        ),
+      );
     }
     if (food.betaCaroteneMcg > 0) {
-      rows.add(_VitRow('β-Carotene', food.betaCaroteneMcg * grams / 100, 'mcg',
-          Icons.wb_sunny_rounded, Colors.amberAccent));
+      rows.add(
+        _VitRow(
+          'β-Carotene',
+          food.betaCaroteneMcg * grams / 100,
+          'mcg',
+          Icons.wb_sunny_rounded,
+          Colors.amberAccent,
+        ),
+      );
     }
     if (food.vitaminB1Mg > 0) {
-      rows.add(_VitRow('Vitamin B1', food.vitaminB1Mg * grams / 100, 'mg',
-          Icons.bolt_rounded, Colors.yellowAccent));
+      rows.add(
+        _VitRow(
+          'Vitamin B1',
+          food.vitaminB1Mg * grams / 100,
+          'mg',
+          Icons.bolt_rounded,
+          Colors.yellowAccent,
+        ),
+      );
     }
     if (food.calciumMg > 0) {
-      rows.add(_VitRow('Calcium', food.calciumFor(grams), 'mg',
-          Icons.science_rounded, const Color(0xFF80DEEA)));
+      rows.add(
+        _VitRow(
+          'Calcium',
+          food.calciumFor(grams),
+          'mg',
+          Icons.science_rounded,
+          const Color(0xFF80DEEA),
+        ),
+      );
     }
     if (food.ironMg > 0) {
-      rows.add(_VitRow('Iron', food.ironFor(grams), 'mg',
-          Icons.water_drop_rounded, Colors.redAccent));
+      rows.add(
+        _VitRow(
+          'Iron',
+          food.ironFor(grams),
+          'mg',
+          Icons.water_drop_rounded,
+          Colors.redAccent,
+        ),
+      );
     }
     if (food.phosphorusMg > 0) {
-      rows.add(_VitRow('Phosphorus', food.phosphorusMg * grams / 100, 'mg',
-          Icons.circle_rounded, Colors.purpleAccent));
+      rows.add(
+        _VitRow(
+          'Phosphorus',
+          food.phosphorusMg * grams / 100,
+          'mg',
+          Icons.circle_rounded,
+          Colors.purpleAccent,
+        ),
+      );
     }
     if (food.sodiumMg > 0) {
-      rows.add(_VitRow('Sodium', food.sodiumMg * grams / 100, 'mg',
-          Icons.grain_rounded, Colors.blueGrey));
+      rows.add(
+        _VitRow(
+          'Sodium',
+          food.sodiumMg * grams / 100,
+          'mg',
+          Icons.grain_rounded,
+          Colors.blueGrey,
+        ),
+      );
     }
     if (food.potassiumMg > 0) {
-      rows.add(_VitRow('Potassium', food.potassiumMg * grams / 100, 'mg',
-          Icons.electrical_services_rounded, Colors.tealAccent));
+      rows.add(
+        _VitRow(
+          'Potassium',
+          food.potassiumMg * grams / 100,
+          'mg',
+          Icons.electrical_services_rounded,
+          Colors.tealAccent,
+        ),
+      );
     }
 
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -2479,6 +2585,94 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
         ],
       ),
     );
+  }
+}
+
+class _CyberpunkProgressBar extends StatelessWidget {
+  const _CyberpunkProgressBar({
+    required this.value,
+    required this.color,
+    required this.trackColor,
+    this.height = 8,
+  });
+
+  final double value;
+  final Color color;
+  final Color trackColor;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = value.clamp(0.0, 1.0);
+
+    return SizedBox(
+      height: height,
+      child: CustomPaint(
+        painter: _CyberpunkProgressPainter(
+          value: normalized,
+          color: color,
+          trackColor: trackColor,
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _CyberpunkProgressPainter extends CustomPainter {
+  const _CyberpunkProgressPainter({
+    required this.value,
+    required this.color,
+    required this.trackColor,
+  });
+
+  final double value;
+  final Color color;
+  final Color trackColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final skew = size.height * 1.2;
+    final track = Path()
+      ..moveTo(skew, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width - skew, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+
+    canvas.drawPath(track, Paint()..color = trackColor);
+
+    final fillWidth = size.width * value;
+    if (fillWidth <= 0) return;
+
+    final fill = Path()
+      ..moveTo(skew, 0)
+      ..lineTo(fillWidth, 0)
+      ..lineTo((fillWidth - skew).clamp(0.0, size.width), size.height)
+      ..lineTo(0, size.height)
+      ..close();
+
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [color, const Color(0xFFFF2A2A), const Color(0xFFFF8A5C)],
+        ).createShader(Offset.zero & size),
+    );
+
+    final slashPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.24)
+      ..strokeWidth = 1;
+    for (var x = 18.0; x < fillWidth; x += 24) {
+      canvas.drawLine(Offset(x, size.height), Offset(x + skew, 0), slashPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CyberpunkProgressPainter oldDelegate) {
+    return oldDelegate.value != value ||
+        oldDelegate.color != color ||
+        oldDelegate.trackColor != trackColor;
   }
 }
 

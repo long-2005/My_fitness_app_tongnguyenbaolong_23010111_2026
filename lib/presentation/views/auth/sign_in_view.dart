@@ -1,8 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_application_1/data/repositories/language_repository.dart';
+import 'package:flutter_application_1/l10n/app_strings.dart';
 import 'package:flutter_application_1/main.dart';
-import 'package:flutter_application_1/view/widgets/Ui.dart';
+import 'package:flutter_application_1/presentation/views/auth/forgot_password_view.dart';
+import 'package:flutter_application_1/presentation/widgets/ui_background.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class SignInView extends StatefulWidget {
@@ -64,6 +68,37 @@ class _SignInViewState extends State<SignInView> {
     );
   }
 
+  String _getFriendlyAuthError(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'No account found for this email. Please check and try again.';
+      case 'wrong-password':
+        return 'Incorrect password. Please try again.';
+      case 'invalid-email':
+        return 'The email address is not valid.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a few minutes and try again.';
+      case 'network-request-failed':
+        return 'No internet connection. Please check your Wi-Fi or mobile data.';
+      case 'invalid-credential':
+        return 'Incorrect email or password. Please check your credentials.';
+      case 'account-exists-with-different-credential':
+        return 'This email is already registered with a different sign-in method.';
+      case 'email-already-in-use':
+        return 'This email is already in use. Please sign in or use a different email.';
+      case 'weak-password':
+        return 'Password is too weak. Please use at least 6 characters.';
+      case 'operation-not-allowed':
+        return 'This sign-in method is not enabled.';
+      case 'requires-recent-login':
+        return 'Your session has expired. Please sign in again.';
+      default:
+        return 'An error occurred. Please try again.';
+    }
+  }
+
   Future<void> _navigateToHome() async {
     if (!mounted) return;
 
@@ -84,13 +119,75 @@ class _SignInViewState extends State<SignInView> {
       );
 
       await _auth.signInWithCredential(credential);
+      await LanguageService().loadForCurrentUser();
       await _navigateToHome();
     } on GoogleSignInException catch (e) {
-      _showErrorSnackBar(e.description ?? 'Google sign in failed');
+      if (e.code == GoogleSignInExceptionCode.canceled) return;
+      _showErrorSnackBar(
+        'Google sign-in failed. Please check your internet connection and try again.',
+      );
+      debugPrint('Google sign-in error: ${e.description}');
     } on FirebaseAuthException catch (e) {
-      _showErrorSnackBar(e.message ?? 'Authentication failed');
+      _showErrorSnackBar(_getFriendlyAuthError(e.code));
     } catch (e) {
-      _showErrorSnackBar('Error: $e');
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('network') ||
+          msg.contains('socket') ||
+          msg.contains('timeout')) {
+        _showErrorSnackBar(
+          'No internet connection. Please check your Wi-Fi or mobile data.',
+        );
+      } else {
+        _showErrorSnackBar('An unexpected error occurred. Please try again.');
+      }
+      debugPrint('Unexpected Google sign-in error: $e');
+    } finally {
+      if (mounted && ModalRoute.of(context)?.settings.name == AppRoutes.login) {
+        _setLoading(false);
+      }
+    }
+  }
+
+  Future<void> _handleFacebookSignIn() async {
+    _setLoading(true);
+
+    try {
+      final LoginResult loginResult = await FacebookAuth.instance.login(
+        permissions: const ['email', 'public_profile'],
+      );
+
+      if (loginResult.status == LoginStatus.cancelled) return;
+
+      final accessToken = loginResult.accessToken;
+      if (loginResult.status != LoginStatus.success || accessToken == null) {
+        _showErrorSnackBar(
+          loginResult.message ??
+              'Facebook sign-in failed. Please try again.',
+        );
+        return;
+      }
+
+      final credential = FacebookAuthProvider.credential(accessToken.tokenString);
+
+      await _auth.signInWithCredential(credential);
+      await LanguageService().loadForCurrentUser();
+      await _navigateToHome();
+    } on FirebaseAuthException catch (e) {
+      _showErrorSnackBar(_getFriendlyAuthError(e.code));
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('network') ||
+          msg.contains('socket') ||
+          msg.contains('timeout')) {
+        _showErrorSnackBar(
+          'No internet connection. Please check your Wi-Fi or mobile data.',
+        );
+      } else {
+        _showErrorSnackBar(
+          'Facebook sign-in failed. Please check your setup and try again.',
+        );
+      }
+      debugPrint('Unexpected Facebook sign-in error: $e');
     } finally {
       if (mounted && ModalRoute.of(context)?.settings.name == AppRoutes.login) {
         _setLoading(false);
@@ -109,11 +206,22 @@ class _SignInViewState extends State<SignInView> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      await LanguageService().loadForCurrentUser();
       await _navigateToHome();
     } on FirebaseAuthException catch (e) {
-      _showErrorSnackBar(e.message ?? 'Authentication failed');
+      _showErrorSnackBar(_getFriendlyAuthError(e.code));
     } catch (e) {
-      _showErrorSnackBar('Unexpected error: $e');
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('network') ||
+          msg.contains('socket') ||
+          msg.contains('timeout')) {
+        _showErrorSnackBar(
+          'No internet connection. Please check your Wi-Fi or mobile data.',
+        );
+      } else {
+        _showErrorSnackBar('An unexpected error occurred. Please try again.');
+      }
+      debugPrint('Unexpected sign-in error: $e');
     } finally {
       if (mounted && ModalRoute.of(context)?.settings.name == AppRoutes.login) {
         _setLoading(false);
@@ -163,11 +271,12 @@ class _SignInViewState extends State<SignInView> {
   }
 
   Widget _buildHeader() {
+    final s = AppStrings.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Welcome To,',
+          s.welcomeTo,
           style: const TextStyle(
             fontSize: 14,
             fontFamily: 'Poppins',
@@ -177,7 +286,7 @@ class _SignInViewState extends State<SignInView> {
         ).animate().fadeIn(duration: 900.ms).slideX(begin: -0.1, end: 0),
         const SizedBox(height: 6),
         Text(
-          'The Onyx Lab!',
+          s.appName,
           style: const TextStyle(
             fontSize: 20,
             fontFamily: 'Poppins',
@@ -190,6 +299,7 @@ class _SignInViewState extends State<SignInView> {
   }
 
   Widget _buildSignInCard() {
+    final s = AppStrings.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -209,9 +319,9 @@ class _SignInViewState extends State<SignInView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Sign in',
-              style: TextStyle(
+            Text(
+              s.signIn,
+              style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -222,7 +332,9 @@ class _SignInViewState extends State<SignInView> {
             _buildEmailField(),
             const SizedBox(height: 20),
             _buildPasswordField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            _buildForgotPasswordLink().animate().fadeIn(delay: 400.ms),
+            const SizedBox(height: 16),
             _buildPrimaryButton(),
             const SizedBox(height: 20),
             _buildSignUpPrompt().animate().fadeIn(delay: 600.ms),
@@ -235,6 +347,7 @@ class _SignInViewState extends State<SignInView> {
   }
 
   Widget _buildEmailField() {
+    final s = AppStrings.of(context);
     return TextFormField(
       controller: _emailController,
       keyboardType: TextInputType.emailAddress,
@@ -247,35 +360,30 @@ class _SignInViewState extends State<SignInView> {
       ),
       validator: (value) {
         final email = value?.trim() ?? '';
-        if (email.isEmpty) return 'Please enter your email';
-        if (!email.contains('@') || !email.contains('.')) {
-          return 'Please enter a valid email';
-        }
+        if (email.isEmpty) return s.pleaseEnterEmail;
+        if (!email.contains('@') || !email.contains('.')) return s.invalidEmail;
         return null;
       },
       decoration: InputDecoration(
-        labelText: 'Email',
+        labelText: s.email,
         labelStyle: const TextStyle(
           color: Color.fromARGB(255, 215, 215, 215),
           fontFamily: 'Poppins',
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
   Widget _buildPasswordField() {
+    final s = AppStrings.of(context);
     return TextFormField(
       controller: _passwordController,
       obscureText: _obscurePassword,
       textInputAction: TextInputAction.done,
       autofillHints: const [AutofillHints.password],
       onFieldSubmitted: (_) {
-        if (!_isLoading) {
-          _handleSignIn();
-        }
+        if (!_isLoading) _handleSignIn();
       },
       style: const TextStyle(
         color: Color.fromARGB(239, 227, 227, 227),
@@ -283,15 +391,13 @@ class _SignInViewState extends State<SignInView> {
         fontFamily: 'Poppins',
       ),
       validator: (value) {
-        final password = value?.trim() ?? '';
-        if (password.isEmpty) return 'Please enter your password';
-        if (password.length < 6) {
-          return 'Password must be at least 6 characters';
-        }
+        final pw = value?.trim() ?? '';
+        if (pw.isEmpty) return s.pleaseEnterPassword;
+        if (pw.length < 6) return s.passwordTooShort;
         return null;
       },
       decoration: InputDecoration(
-        labelText: 'Password',
+        labelText: s.password,
         labelStyle: const TextStyle(
           fontFamily: 'Poppins',
           color: Color.fromARGB(255, 215, 215, 215),
@@ -301,20 +407,15 @@ class _SignInViewState extends State<SignInView> {
             _obscurePassword ? Icons.visibility_off : Icons.visibility,
             color: Colors.grey,
           ),
-          onPressed: () {
-            setState(() {
-              _obscurePassword = !_obscurePassword;
-            });
-          },
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
   Widget _buildPrimaryButton() {
+    final s = AppStrings.of(context);
     return SizedBox(
       width: double.infinity,
       height: 55,
@@ -341,9 +442,9 @@ class _SignInViewState extends State<SignInView> {
                   strokeWidth: 3,
                 ),
               )
-            : const Text(
-                'Lets go',
-                style: TextStyle(
+            : Text(
+                s.letsGo,
+                style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -354,25 +455,46 @@ class _SignInViewState extends State<SignInView> {
     );
   }
 
+  Widget _buildForgotPasswordLink() {
+    final s = AppStrings.of(context);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ForgotPasswordView()),
+        ),
+        child: Text(
+          s.forgotPassword,
+          style: const TextStyle(
+            fontFamily: 'Poppins',
+            color: Color(0xFFE16D6D),
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSignUpPrompt() {
+    final s = AppStrings.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
-          "Don't have an account? ",
-          style: TextStyle(
+        Text(
+          s.noAccount,
+          style: const TextStyle(
             fontFamily: 'Poppins',
             color: Colors.grey,
             fontSize: 14,
           ),
         ),
         GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(context, AppRoutes.signup);
-          },
-          child: const Text(
-            'Sign Up',
-            style: TextStyle(
+          onTap: () => Navigator.pushNamed(context, AppRoutes.signup),
+          child: Text(
+            s.signUp,
+            style: const TextStyle(
               fontFamily: 'Poppins',
               color: Color.fromARGB(255, 133, 20, 20),
               fontWeight: FontWeight.bold,
@@ -394,11 +516,7 @@ class _SignInViewState extends State<SignInView> {
         ),
         _buildSocialButton(
           iconPath: 'assets/image/facebook_logo.png',
-          onTap: _isLoading
-              ? null
-              : () {
-                  debugPrint('Sign in with facebook');
-                },
+          onTap: _isLoading ? null : _handleFacebookSignIn,
         ),
       ],
     );

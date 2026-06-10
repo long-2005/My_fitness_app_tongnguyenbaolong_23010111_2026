@@ -1,3 +1,14 @@
+/// **FoodItem** — Thực thể mô tả một loại thực phẩm trong cơ sở dữ liệu dinh dưỡng.
+///
+/// Lưu thông tin dinh dưỡng cơ bản (calo, protein, chất béo, carbs)
+/// và vi chất dinh dưỡng (vitamin, canxi, sắt, chất xơ) cho mọi 100g thực phẩm.
+///
+/// Có hai nguồn gốc:
+/// - Tự động tải từ file JSON nội bộ qua `FoodItem.fromDb(...)`.
+/// - Do người dùng tự tạo và được lưu trên Firestore qua `FoodItem.fromFirestore(...)`.
+///
+/// Các hàm tiện ích như `caloriesFor(grams)`, `proteinFor(grams)`...
+/// giúp tính toán lượng dinh dưỡng thực tế theo khối lượng người dùng ăn.
 class FoodItem {
   const FoodItem({
     required this.name,

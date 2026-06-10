@@ -1,3 +1,12 @@
+/// **BmiRecord** — Thực thể lưu trữ một bản ghi đo lường sức khỏe của người dùng.
+///
+/// Chứa toàn bộ dữ liệu đầu vào (cân nặng, chiều cao, tuổi, giới tính, mức độ
+/// hoạt động) và các chỉ số được tính toán (BMI, BMR, TDEE, phân loại BMI).
+///
+/// **Cách sử dụng:**
+/// - Dùng `BmiRecord.calculate(...)` để tạo bản ghi mới từ thông tin nhập vào.
+/// - Dùng `BmiRecord.fromMap(...)` để khôi phục bản ghi từ dữ liệu Firestore.
+/// - Dùng `toMap()` để chuẩn bị dữ liệu trước khi lưu lên Firestore.
 class BmiRecord {
   // Dữ liệu đầu vào
   final double weight;

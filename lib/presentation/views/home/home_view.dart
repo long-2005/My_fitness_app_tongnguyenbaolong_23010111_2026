@@ -2,15 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../services/bmi_service.dart';
-import '../../services/nutrition_service.dart';
-import '../../user/bmi_record.dart';
-import '../../user/meal_entry.dart';
-import '../../user/vitamin_goal.dart';
-import 'bmi_view.dart';
-import 'calo_tracking_view.dart';
-import 'exercise_library_view.dart';
-import 'schedule_view.dart';
+import 'package:flutter_application_1/l10n/app_strings.dart';
+import 'package:flutter_application_1/data/repositories/auth_session_repository.dart';
+import 'package:flutter_application_1/data/repositories/bmi_repository.dart';
+import 'package:flutter_application_1/data/repositories/nutrition_repository.dart';
+import 'package:flutter_application_1/data/models/bmi_record.dart';
+import 'package:flutter_application_1/data/models/meal_entry.dart';
+import '../../../main.dart';
+import 'package:flutter_application_1/presentation/views/bmi/bmi_view.dart';
+import 'package:flutter_application_1/presentation/views/nutrition/calo_tracking_view.dart';
+import 'package:flutter_application_1/presentation/views/workout/schedule_view.dart';
+import 'package:flutter_application_1/presentation/views/settings/settings_view.dart';
+import 'package:flutter_application_1/presentation/views/progress/progress_view.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -27,6 +30,7 @@ class _HomeViewState extends State<HomeView> {
     BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 6)),
   ];
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
   final NutritionService _nutritionService = NutritionService.instance;
   final BmiService _bmiService = BmiService();
@@ -35,9 +39,12 @@ class _HomeViewState extends State<HomeView> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final photoUrl = user?.photoURL;
+    final s = AppStrings.of(context);
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Colors.black,
+      endDrawer: _buildProfileDrawer(user),
       body: SafeArea(
         bottom: false,
         child: IndexedStack(
@@ -78,31 +85,26 @@ class _HomeViewState extends State<HomeView> {
               _selectedIndex = index;
             });
           },
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home',
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home),
+              label: s.homeTab,
             ),
             NavigationDestination(
-              icon: Icon(Icons.monitor_weight_outlined),
-              selectedIcon: Icon(Icons.monitor_weight),
-              label: 'BMI & TDEE',
+              icon: const Icon(Icons.monitor_weight_outlined),
+              selectedIcon: const Icon(Icons.monitor_weight),
+              label: s.bmiTab,
             ),
             NavigationDestination(
-              icon: Icon(Icons.track_changes_outlined),
-              selectedIcon: Icon(Icons.track_changes),
-              label: 'Calo Track',
+              icon: const Icon(Icons.track_changes_outlined),
+              selectedIcon: const Icon(Icons.track_changes),
+              label: s.caloTab,
             ),
             NavigationDestination(
-              icon: Icon(Icons.calendar_month_outlined),
-              selectedIcon: Icon(Icons.calendar_month),
-              label: 'Schedule',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.fitness_center_outlined),
-              selectedIcon: Icon(Icons.fitness_center),
-              label: 'Library',
+              icon: const Icon(Icons.calendar_month_outlined),
+              selectedIcon: const Icon(Icons.calendar_month),
+              label: s.scheduleTab,
             ),
           ],
         ),
@@ -123,6 +125,8 @@ class _HomeViewState extends State<HomeView> {
                 _buildLatestHealthSection(user),
                 const SizedBox(height: 18),
                 _buildTodayNutritionSection(user),
+                const SizedBox(height: 18),
+                const ProgressView(embedded: true),
               ],
             ),
           ),
@@ -132,19 +136,22 @@ class _HomeViewState extends State<HomeView> {
     const BmiView(),
     const CaloTrackingView(),
     const ScheduleView(),
-    const ExerciseLibraryView(),
   ];
 
   // Home app bar: greeting, logo, and user avatar.
   Widget _buildHomeAppBar(User? user, String? photoUrl) {
+    final s = AppStrings.of(context);
     final username = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
     final avatar = _avatarImage(photoUrl);
 
     return SliverAppBar(
-      floating: true,
-      backgroundColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      actions: const [SizedBox.shrink()],
+      pinned: true,
+      backgroundColor: const Color(0xFF0F0F0F),
       surfaceTintColor: Colors.transparent,
       elevation: 0,
+      scrolledUnderElevation: 0,
       toolbarHeight: 70,
       titleSpacing: 20,
       title: Stack(
@@ -156,7 +163,7 @@ class _HomeViewState extends State<HomeView> {
               builder: (context) => SizedBox(
                 width: MediaQuery.of(context).size.width * 0.35,
                 child: Text(
-                  'Welcome back, $username',
+                  '${s.welcomeBack} $username',
                   style: const TextStyle(
                     fontSize: 14,
                     fontFamily: 'Poppins',
@@ -180,13 +187,248 @@ class _HomeViewState extends State<HomeView> {
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.grey.shade900,
-              backgroundImage: avatar,
-              child: avatar == null
-                  ? const Icon(Icons.person, color: Colors.white)
-                  : null,
+            child: GestureDetector(
+              onTap: () => _scaffoldKey.currentState?.openEndDrawer(),
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.grey.shade900,
+                backgroundImage: avatar,
+                child: avatar == null
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Right side profile drawer ───────────────────────────────────────────
+  Widget _buildProfileDrawer(User? user) {
+    final s = AppStrings.of(context);
+    final photoUrl = user?.photoURL;
+    final avatar = _avatarImage(photoUrl);
+    final displayName =
+        user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
+    final email = user?.email ?? '';
+
+    return Drawer(
+      width: MediaQuery.of(context).size.width * 0.78,
+      backgroundColor: const Color(0xFF0F0F0F),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(28),
+          bottomLeft: Radius.circular(28),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header ──
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF851414).withValues(alpha: 0.85),
+                    const Color(0xFF1A1A1A),
+                  ],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 38,
+                    backgroundColor: Colors.grey.shade800,
+                    backgroundImage: avatar,
+                    child: avatar == null
+                        ? const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 36,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  if (email.isNotEmpty)
+                    Text(
+                      email,
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 13,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Menu items ──
+            _buildDrawerItem(
+              icon: Icons.settings_outlined,
+              label: s.settings,
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsView()),
+                );
+              },
+            ),
+
+            _buildDrawerItem(
+              icon: Icons.help_outline_rounded,
+              label: s.helpSupport,
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(s.helpComingSoon),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: const Color(0xFF333333),
+                  ),
+                );
+              },
+            ),
+
+            const Spacer(),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Divider(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+
+            // ── Sign Out ──
+            _buildDrawerItem(
+              icon: Icons.logout_rounded,
+              label: 'log out',
+              color: _accent,
+              onTap: () => _showSignOutDialog(),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color color = const Color(0xFFD7D7D7),
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: color.withValues(alpha: 0.4),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSignOutDialog() {
+    final s = AppStrings.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          s.signOutConfirmTitle,
+          style: const TextStyle(
+            color: Colors.white,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          s.signOutConfirmMessage,
+          style: const TextStyle(color: Colors.grey, fontFamily: 'Poppins'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              s.cancel,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // Close drawer
+              await AuthSessionRepository.signOut();
+              if (mounted) {
+                await Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil(AppRoutes.login, (r) => false);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF851414),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              s.signOut,
+              style: const TextStyle(
+                color: Colors.white,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -196,12 +438,12 @@ class _HomeViewState extends State<HomeView> {
 
   // Latest BMI/TDEE summary card from the newest health record.
   Widget _buildLatestHealthSection(User? user) {
+    final s = AppStrings.of(context);
     if (user == null) {
       return _buildMessageCard(
         icon: Icons.lock_outline_rounded,
-        title: 'Not signed in',
-        message:
-            'Sign in to display your BMI, TDEE, and latest health records on the Home page.',
+        title: s.notSignedIn,
+        message: s.signInToSeeMetrics,
       );
     }
 
@@ -249,7 +491,7 @@ class _HomeViewState extends State<HomeView> {
                 const Icon(Icons.insights_rounded, color: _accent, size: 22),
                 const SizedBox(width: 8),
                 Text(
-                  'Latest metrics',
+                  s.latestMetrics,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
@@ -401,12 +643,12 @@ class _HomeViewState extends State<HomeView> {
 
   // Daily nutrition summary and comparison with TDEE.
   Widget _buildTodayNutritionSection(User? user) {
+    final s = AppStrings.of(context);
     if (user == null) {
       return _buildMessageCard(
         icon: Icons.restaurant_menu_rounded,
-        title: 'Daily meal dashboard locked',
-        message:
-            'Sign in to display today\'s meals, calories, and quick nutrition overview.',
+        title: s.dailyMealLocked,
+        message: s.signInToSeeMeals,
       );
     }
 
@@ -454,31 +696,20 @@ class _HomeViewState extends State<HomeView> {
               0,
               (total, item) => total + item.carbs,
             );
-            final balance = latestRecord == null
-                ? null
-                : calories - latestRecord.tdee;
-            final weeklyKgChange = balance == null
-                ? null
-                : (balance * 7) / 7700;
-            final balanceColor = _balanceColor(balance);
+            final calorieGoal = latestRecord?.tdee.toDouble() ?? 2930.0;
+            final caloriesLeft = calorieGoal - calories;
 
             return Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(22),
-              decoration: _cardDecoration(),
+              padding: const EdgeInsets.all(20),
+              decoration: _cardDecoration(hasShadow: false),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.restaurant_menu_rounded,
-                        color: _accent,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 8),
                       Text(
-                        'Today\'s menu',
+                        'Today',
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: Colors.white,
@@ -507,7 +738,7 @@ class _HomeViewState extends State<HomeView> {
                   const SizedBox(height: 12),
                   if (entries.isEmpty)
                     Text(
-                      'No foods logged today. Use Calo Track to build your plan and show it here.',
+                      s.noFoodsLogged,
                       style: TextStyle(
                         color: Colors.grey.shade400,
                         fontSize: 13,
@@ -516,107 +747,23 @@ class _HomeViewState extends State<HomeView> {
                       ),
                     )
                   else ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildOverviewStat(
-                            title: 'Calories',
-                            value: calories.toStringAsFixed(0),
-                            unit: 'kcal',
-                            icon: Icons.local_fire_department_rounded,
-                            color: const Color(0xFFFF9F43),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildOverviewStat(
-                            title: 'Protein',
-                            value: protein.toStringAsFixed(1),
-                            unit: 'g',
-                            icon: Icons.egg_alt_rounded,
-                            color: const Color(0xFF64B5F6),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildOverviewStat(
-                            title: 'Fat',
-                            value: fat.toStringAsFixed(1),
-                            unit: 'g',
-                            icon: Icons.opacity_rounded,
-                            color: const Color(0xFFFFB74D),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildOverviewStat(
-                            title: 'Carbs',
-                            value: carbs.toStringAsFixed(1),
-                            unit: 'g',
-                            icon: Icons.grain_rounded,
-                            color: Colors.greenAccent,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    if (latestRecord == null)
+                    _homeCaloriesPanel(calories, calorieGoal, caloriesLeft),
+                    const SizedBox(height: 10),
+                    _homeMacrosPanel(carbs: carbs, fat: fat, protein: protein),
+                    if (latestRecord == null) ...[
+                      const SizedBox(height: 12),
                       Text(
-                        'Open BMI & TDEE to calculate your maintenance calories before comparing your meal plan.',
+                        'Add BMI & TDEE to compare against your calorie goal.',
                         style: TextStyle(
                           color: Colors.grey.shade400,
                           fontSize: 12,
                           height: 1.5,
                           fontFamily: 'Poppins',
                         ),
-                      )
-                    else ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildOverviewStat(
-                              title: 'Balance',
-                              value: balance!.abs().toStringAsFixed(0),
-                              unit: 'kcal',
-                              icon: balance < 0
-                                  ? Icons.trending_down_rounded
-                                  : Icons.trending_up_rounded,
-                              color: balanceColor,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildOverviewStat(
-                              title: 'Est. weight',
-                              value: _formatKgChange(weeklyKgChange!),
-                              unit: 'per week',
-                              icon: Icons.monitor_weight_rounded,
-                              color: balanceColor,
-                            ),
-                          ),
-                        ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _goalSummary(balance, weeklyKgChange),
-                        style: TextStyle(
-                          color: Colors.grey.shade300,
-                          fontSize: 12,
-                          height: 1.5,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ],
-                    if (latestRecord != null) ...[
-                      const SizedBox(height: 16),
-                      _buildVitaminCompactPills(entries, latestRecord),
                     ],
                     const SizedBox(height: 16),
-                    ...entries.take(4).map(_buildMealPreviewChip),
+                    ...entries.take(3).map(_buildMealPreviewChip),
                   ],
                 ],
               ),
@@ -624,6 +771,185 @@ class _HomeViewState extends State<HomeView> {
           },
         );
       },
+    );
+  }
+
+  Widget _homeCaloriesPanel(
+    double calories,
+    double calorieGoal,
+    double caloriesLeft,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Calories',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${calories.toStringAsFixed(0)} cal',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '/ ${calorieGoal.toStringAsFixed(0)}',
+                style: TextStyle(
+                  color: Colors.grey.shade300,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const Spacer(),
+              Text(
+                caloriesLeft >= 0
+                    ? '${caloriesLeft.toStringAsFixed(0)} left'
+                    : '${caloriesLeft.abs().toStringAsFixed(0)} over',
+                style: TextStyle(
+                  color: caloriesLeft >= 0 ? Colors.white70 : _accent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _HomeCyberpunkProgressBar(
+            value: (calories / calorieGoal).clamp(0.0, 1.0),
+            color: _accent,
+            trackColor: Colors.white.withValues(alpha: 0.12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _homeMacrosPanel({
+    required double carbs,
+    required double fat,
+    required double protein,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _homeMacroMeter(
+              label: 'Carbs',
+              value: carbs,
+              goal: 366,
+              color: const Color(0xFF37D5C8),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: _homeMacroMeter(
+              label: 'Fat',
+              value: fat,
+              goal: 98,
+              color: const Color(0xFF8E24AA),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: _homeMacroMeter(
+              label: 'Protein',
+              value: protein,
+              goal: 146,
+              color: const Color(0xFFFFB74D),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _homeMacroMeter({
+    required String label,
+    required double value,
+    required double goal,
+    required Color color,
+  }) {
+    final safeGoal = goal <= 0 ? 1.0 : goal;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: '${value.toStringAsFixed(0)} g',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                TextSpan(
+                  text: ' / ${safeGoal.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _HomeCyberpunkProgressBar(
+          value: (value / safeGoal).clamp(0.0, 1.0),
+          color: color,
+          height: 7,
+          trackColor: Colors.white.withValues(alpha: 0.12),
+        ),
+      ],
     );
   }
 
@@ -639,87 +965,6 @@ class _HomeViewState extends State<HomeView> {
           _selectedIndex = 1;
         });
       },
-    );
-  }
-
-  Widget _buildVitaminCompactPills(List<MealEntry> entries, BmiRecord record) {
-    final goal = VitaminGoal.forProfile(age: record.age, gender: record.gender);
-
-    final totalVitC = entries.fold<double>(0, (total, item) => total + item.vitaminC);
-    final totalVitA = entries.fold<double>(0, (total, item) => total + item.vitaminA);
-    final totalVitB1 = entries.fold<double>(0, (total, item) => total + item.vitaminB1);
-    final totalCalcium = entries.fold<double>(0, (total, item) => total + item.calcium);
-    final totalIron = entries.fold<double>(0, (total, item) => total + item.iron);
-    final totalFiber = entries.fold<double>(0, (total, item) => total + item.fiber);
-
-    Widget pill(String label, double current, double target) {
-      final percent = (current / target).clamp(0.0, 1.0);
-      Color color = Colors.redAccent;
-      if (percent >= 0.8) {
-        color = Colors.greenAccent;
-      } else if (percent >= 0.4) {
-        color = Colors.orangeAccent;
-      }
-
-      return Container(
-        margin: const EdgeInsets.only(right: 8, bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Poppins',
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${(percent * 100).toInt()}%',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Daily Vitamins',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            fontFamily: 'Poppins',
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          children: [
-            pill('Vit C', totalVitC, goal.vitaminC),
-            pill('Vit A', totalVitA, goal.vitaminA),
-            pill('Vit B1', totalVitB1, goal.vitaminB1),
-            pill('Ca', totalCalcium, goal.calcium),
-            pill('Fe', totalIron, goal.iron),
-            pill('Fiber', totalFiber, goal.fiber),
-          ],
-        ),
-      ],
     );
   }
 
@@ -941,37 +1186,6 @@ class _HomeViewState extends State<HomeView> {
   ImageProvider? _avatarImage(String? photoUrl) =>
       photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null;
 
-  Color _balanceColor(double? balance) {
-    if (balance == null) {
-      return Colors.grey;
-    }
-    if (balance <= -150) {
-      return Colors.greenAccent;
-    }
-    if (balance >= 150) {
-      return const Color(0xFFFFB74D);
-    }
-    return const Color(0xFF64B5F6);
-  }
-
-  String _formatKgChange(double weeklyKgChange) {
-    if (weeklyKgChange.abs() < 0.01) {
-      return '~0.00';
-    }
-    final sign = weeklyKgChange > 0 ? '+' : '-';
-    return '$sign${weeklyKgChange.abs().toStringAsFixed(2)}';
-  }
-
-  String _goalSummary(double balance, double weeklyKgChange) {
-    if (balance <= -150) {
-      return 'You are under TDEE by about ${balance.abs().toStringAsFixed(0)} kcal today, roughly ${weeklyKgChange.abs().toStringAsFixed(2)} kg loss/week if maintained.';
-    }
-    if (balance >= 150) {
-      return 'You are above TDEE by about ${balance.abs().toStringAsFixed(0)} kcal today, roughly ${weeklyKgChange.abs().toStringAsFixed(2)} kg gain/week if maintained.';
-    }
-    return 'Your intake is close to maintenance today, so your body weight should stay relatively stable if this pattern continues.';
-  }
-
   String _getBmiStatus(double bmi) {
     if (bmi < 18.5) {
       return 'Underweight';
@@ -996,5 +1210,84 @@ class _HomeViewState extends State<HomeView> {
       return const Color(0xFFFFB74D);
     }
     return const Color(0xFFEF5350);
+  }
+}
+
+class _HomeCyberpunkProgressBar extends StatelessWidget {
+  const _HomeCyberpunkProgressBar({
+    required this.value,
+    required this.color,
+    required this.trackColor,
+    this.height = 8,
+  });
+
+  final double value;
+  final Color color;
+  final Color trackColor;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _HomeCyberpunkProgressPainter(
+          value: value.clamp(0.0, 1.0),
+          color: color,
+          trackColor: trackColor,
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeCyberpunkProgressPainter extends CustomPainter {
+  const _HomeCyberpunkProgressPainter({
+    required this.value,
+    required this.color,
+    required this.trackColor,
+  });
+
+  final double value;
+  final Color color;
+  final Color trackColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.fill;
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [color.withValues(alpha: 0.75), color],
+      ).createShader(Offset.zero & size)
+      ..style = PaintingStyle.fill;
+
+    final track = Path()
+      ..moveTo(5, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width - 5, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(track, trackPaint);
+
+    final fillWidth = (size.width * value).clamp(0.0, size.width);
+    if (fillWidth <= 0) return;
+
+    final fill = Path()
+      ..moveTo(5, 0)
+      ..lineTo(fillWidth, 0)
+      ..lineTo((fillWidth - 5).clamp(0.0, size.width), size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(fill, fillPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HomeCyberpunkProgressPainter oldDelegate) {
+    return oldDelegate.value != value ||
+        oldDelegate.color != color ||
+        oldDelegate.trackColor != trackColor;
   }
 }
