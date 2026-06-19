@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 //  SERVICE: NutritionService
 //  Chịu trách nhiệm:
 //    - Tìm kiếm thực phẩm từ Firestore (collection 'foods')
@@ -56,48 +56,53 @@ class NutritionService {
     String query, {
     String category = 'All',
   }) async {
-    final normalized = _normalize(query);
+    try {
+      final normalized = _normalize(query);
 
-    // 1. Lấy thực phẩm chung từ Firestore
-    Query<Map<String, dynamic>> foodQuery = _foodsRef;
-    if (category != 'All') {
-      foodQuery = foodQuery.where('category', isEqualTo: category);
+      // 1. Lấy thực phẩm chung từ Firestore
+      Query<Map<String, dynamic>> foodQuery = _foodsRef;
+      if (category != 'All') {
+        foodQuery = foodQuery.where('category', isEqualTo: category);
+      }
+
+      final snapshot = await foodQuery.limit(200).get();
+      final allFoods = snapshot.docs
+          .map((doc) => FoodItem.fromDb(doc.data()))
+          .toList();
+
+      // Lọc theo từ khóa tìm kiếm trên client (Firestore free tier không hỗ trợ full-text search)
+      final results = allFoods.where((food) {
+        if (normalized.isEmpty) return true;
+        final searchName = food.searchName.toLowerCase();
+        final name = food.name.toLowerCase();
+        return searchName.contains(normalized) || name.contains(normalized);
+      }).take(60).toList();
+
+      // 2. Lấy món tùy chỉnh của user (nếu đã đăng nhập)
+      final user = currentUser;
+      if (user == null) return results;
+
+      Query<Map<String, dynamic>> customQuery = _customFoodsRef(user.uid);
+      if (category != 'All') {
+        customQuery = customQuery.where('category', isEqualTo: category);
+      }
+
+      final customSnapshot = await customQuery.get();
+      final customFoods = customSnapshot.docs
+          .map((doc) => FoodItem.fromFirestore(doc.id, doc.data()))
+          .where((food) {
+            if (normalized.isEmpty) return true;
+            return food.searchName.contains(normalized) ||
+                food.name.toLowerCase().contains(normalized);
+          })
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      return [...customFoods, ...results];
+    } catch (e) {
+      print("Error searching foods: $e");
+      throw Exception("Failed to search foods database: $e");
     }
-
-    final snapshot = await foodQuery.limit(200).get();
-    final allFoods = snapshot.docs
-        .map((doc) => FoodItem.fromDb(doc.data()))
-        .toList();
-
-    // Lọc theo từ khóa tìm kiếm trên client (Firestore free tier không hỗ trợ full-text search)
-    final results = allFoods.where((food) {
-      if (normalized.isEmpty) return true;
-      final searchName = food.searchName.toLowerCase();
-      final name = food.name.toLowerCase();
-      return searchName.contains(normalized) || name.contains(normalized);
-    }).take(60).toList();
-
-    // 2. Lấy món tùy chỉnh của user (nếu đã đăng nhập)
-    final user = currentUser;
-    if (user == null) return results;
-
-    Query<Map<String, dynamic>> customQuery = _customFoodsRef(user.uid);
-    if (category != 'All') {
-      customQuery = customQuery.where('category', isEqualTo: category);
-    }
-
-    final customSnapshot = await customQuery.get();
-    final customFoods = customSnapshot.docs
-        .map((doc) => FoodItem.fromFirestore(doc.id, doc.data()))
-        .where((food) {
-          if (normalized.isEmpty) return true;
-          return food.searchName.contains(normalized) ||
-              food.name.toLowerCase().contains(normalized);
-        })
-        .toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
-    return [...customFoods, ...results];
   }
 
   // ── Tạo món ăn tùy chỉnh ──────────────────────────────────
@@ -112,20 +117,25 @@ class NutritionService {
     final user = currentUser;
     if (user == null) throw Exception('User not signed in');
 
-    final normalized = _normalize(name);
-    await _customFoodsRef(user.uid).add({
-      'name': name.trim(),
-      'description':
-          description?.trim().isEmpty == true ? null : description?.trim(),
-      'calories': caloriesPer100g,
-      'protein': proteinPer100g,
-      'fat': fatPer100g,
-      'carbs': carbsPer100g,
-      'search_name': normalized,
-      'category': 'Custom',
-      'is_custom': true,
-      'created_at': FieldValue.serverTimestamp(),
-    });
+    try {
+      final normalized = _normalize(name);
+      await _customFoodsRef(user.uid).add({
+        'name': name.trim(),
+        'description':
+            description?.trim().isEmpty == true ? null : description?.trim(),
+        'calories': caloriesPer100g,
+        'protein': proteinPer100g,
+        'fat': fatPer100g,
+        'carbs': carbsPer100g,
+        'search_name': normalized,
+        'category': 'Custom',
+        'is_custom': true,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print("Error creating custom food: $e");
+      throw Exception("Failed to save custom food item: $e");
+    }
   }
 
   // ── Ghi nhật ký bữa ăn ────────────────────────────────────
@@ -137,26 +147,38 @@ class NutritionService {
     final user = currentUser;
     if (user == null) throw Exception('User not signed in');
 
-    unawaited(_pruneOldMealEntries(user.uid));
+    try {
+      unawaited(_pruneOldMealEntries(user.uid));
 
-    await _mealEntriesRef(user.uid).add({
-      'food_name': food.name,
-      'description': food.description,
-      'grams': grams,
-      'meal_type': mealType,
-      'calories': food.caloriesFor(grams),
-      'protein': food.proteinFor(grams),
-      'fat': food.fatFor(grams),
-      'carbs': food.carbsFor(grams),
-      'logged_at': FieldValue.serverTimestamp(),
-      'is_custom': food.isCustom,
-      'vitamin_c': food.vitaminCFor(grams),
-      'vitamin_a': food.vitaminAFor(grams),
-      'vitamin_b1': food.vitaminB1For(grams),
-      'calcium': food.calciumFor(grams),
-      'iron': food.ironFor(grams),
-      'fiber': food.fiberFor(grams),
-    });
+      // Sử dụng ORM thông qua đối tượng MealEntry và toMap() của nó
+      final entry = MealEntry(
+        id: '',
+        foodName: food.name,
+        description: food.description,
+        grams: grams,
+        calories: food.caloriesFor(grams),
+        protein: food.proteinFor(grams),
+        fat: food.fatFor(grams),
+        carbs: food.carbsFor(grams),
+        mealType: mealType,
+        loggedAt: DateTime.now(), // Fallback
+        isCustom: food.isCustom,
+        vitaminC: food.vitaminCFor(grams),
+        vitaminA: food.vitaminAFor(grams),
+        vitaminB1: food.vitaminB1For(grams),
+        calcium: food.calciumFor(grams),
+        iron: food.ironFor(grams),
+        fiber: food.fiberFor(grams),
+      );
+
+      final map = entry.toMap();
+      map['logged_at'] = FieldValue.serverTimestamp(); // Thay thế bằng Firestore server timestamp
+
+      await _mealEntriesRef(user.uid).add(map);
+    } catch (e) {
+      print("Error adding meal entry: $e");
+      throw Exception("Failed to record meal entry: $e");
+    }
   }
 
   // ── Stream nhật ký bữa ăn hôm nay ─────────────────────────
@@ -170,26 +192,37 @@ class NutritionService {
     final start = DateTime(now.year, now.month, now.day);
     final end = start.add(const Duration(days: 1));
 
-    return _mealEntriesRef(user.uid)
-        .where(
-          'logged_at',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(start),
-        )
-        .where('logged_at', isLessThan: Timestamp.fromDate(end))
-        .orderBy('logged_at', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => MealEntry.fromFirestore(doc.id, doc.data()))
-              .toList(),
-        );
+    try {
+      return _mealEntriesRef(user.uid)
+          .where(
+            'logged_at',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(start),
+          )
+          .where('logged_at', isLessThan: Timestamp.fromDate(end))
+          .orderBy('logged_at', descending: true)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => MealEntry.fromFirestore(doc.id, doc.data()))
+                .toList(),
+          );
+    } catch (e) {
+      print("Error getting today meal entries stream: $e");
+      // Trả về stream trống khi lỗi để tránh crash UI
+      return Stream.value(<MealEntry>[]);
+    }
   }
 
   // ── Xóa bản ghi bữa ăn ────────────────────────────────────
   Future<void> deleteMealEntry(String id) async {
     final user = currentUser;
     if (user == null) throw Exception('User not signed in');
-    await _mealEntriesRef(user.uid).doc(id).delete();
+    try {
+      await _mealEntriesRef(user.uid).doc(id).delete();
+    } catch (e) {
+      print("Error deleting meal entry: $e");
+      throw Exception("Failed to delete meal entry: $e");
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────
@@ -200,17 +233,22 @@ class NutritionService {
       DateTime.now().subtract(const Duration(days: _mealHistoryRetentionDays));
 
   Future<void> _pruneOldMealEntries(String uid) async {
-    final cutoff = Timestamp.fromDate(_mealRetentionCutoff());
-    final oldEntries = await _mealEntriesRef(uid)
-        .where('logged_at', isLessThan: cutoff)
-        .get();
+    try {
+      final cutoff = Timestamp.fromDate(_mealRetentionCutoff());
+      final oldEntries = await _mealEntriesRef(uid)
+          .where('logged_at', isLessThan: cutoff)
+          .get();
 
-    if (oldEntries.docs.isEmpty) return;
+      if (oldEntries.docs.isEmpty) return;
 
-    final batch = _firestore.batch();
-    for (final doc in oldEntries.docs) {
-      batch.delete(doc.reference);
+      final batch = _firestore.batch();
+      for (final doc in oldEntries.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (e) {
+      print("Error pruning old meal entries: $e");
     }
-    await batch.commit();
   }
+}
 }

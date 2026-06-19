@@ -8,7 +8,6 @@ import 'package:flutter_application_1/data/repositories/bmi_repository.dart';
 import 'package:flutter_application_1/data/repositories/nutrition_repository.dart';
 import 'package:flutter_application_1/data/models/bmi_record.dart';
 import 'package:flutter_application_1/data/models/meal_entry.dart';
-import '../../../main.dart';
 import 'package:flutter_application_1/presentation/views/bmi/bmi_view.dart';
 import 'package:flutter_application_1/presentation/views/nutrition/calo_tracking_view.dart';
 import 'package:flutter_application_1/presentation/views/workout/schedule_view.dart';
@@ -114,28 +113,36 @@ class _HomeViewState extends State<HomeView> {
 
   // Main tabs rendered by the bottom navigation bar.
   List<Widget> _pages(User? user, String? photoUrl) => [
-    CustomScrollView(
-      slivers: [
-        _buildHomeAppBar(user, photoUrl),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Column(
-              children: [
-                _buildLatestHealthSection(user),
-                const SizedBox(height: 18),
-                _buildTodayNutritionSection(user),
-                const SizedBox(height: 18),
-                const ProgressView(embedded: true),
-              ],
+    RefreshIndicator(
+      onRefresh: () async {
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          setState(() {});
+        }
+      },
+      child: CustomScrollView(
+        slivers: [
+          _buildHomeAppBar(user, photoUrl),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Column(
+                children: [
+                  _buildLatestHealthSection(user),
+                  const SizedBox(height: 18),
+                  _buildTodayNutritionSection(user),
+                  const SizedBox(height: 18),
+                  const ProgressView(embedded: true),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
     const BmiView(),
-    const CaloTrackingView(),
-    const ScheduleView(),
+    CaloTrackingView(isSelected: _selectedIndex == 2),
+    ScheduleView(isSelected: _selectedIndex == 3),
   ];
 
   // Home app bar: greeting, logo, and user avatar.
@@ -338,6 +345,8 @@ class _HomeViewState extends State<HomeView> {
     required VoidCallback onTap,
     Color color = const Color(0xFFD7D7D7),
   }) {
+    // Dùng _HomeDrawerItem StatelessWidget bên ngoài (không phụ thuộc State)
+    // nếu cần tái sử dụng, hiện giữ nguyên vì có callback onTap gắn với context.
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -410,11 +419,7 @@ class _HomeViewState extends State<HomeView> {
               Navigator.pop(ctx);
               Navigator.pop(context); // Close drawer
               await AuthSessionRepository.signOut();
-              if (mounted) {
-                await Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil(AppRoutes.login, (r) => false);
-              }
+              // AuthGate stream tự detect logout và hiển thị SignInView
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF851414),
@@ -564,7 +569,8 @@ class _HomeViewState extends State<HomeView> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildOverviewStat(
+                        // Dùng _HomeOverviewStat (StatelessWidget) thay cho _buildOverviewStat.
+                        child: _HomeOverviewStat(
                           title: 'TDEE',
                           value: '$tdee',
                           unit: 'kcal/day',
@@ -574,7 +580,7 @@ class _HomeViewState extends State<HomeView> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildOverviewStat(
+                        child: _HomeOverviewStat(
                           title: 'BMR',
                           value: '$bmr',
                           unit: 'kcal/day',
@@ -589,20 +595,12 @@ class _HomeViewState extends State<HomeView> {
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      _buildInfoChip(
-                        Icons.monitor_weight_rounded,
-                        '${weight.toStringAsFixed(1)} kg',
-                      ),
-                      _buildInfoChip(
-                        Icons.height_rounded,
-                        '${height.toStringAsFixed(0)} cm',
-                      ),
-                      _buildInfoChip(Icons.cake_rounded, '$age yrs'),
-                      _buildInfoChip(Icons.person_rounded, gender),
-                      _buildInfoChip(
-                        Icons.directions_run_rounded,
-                        'Activity x$activityLevel',
-                      ),
+                      // Dùng _HomeInfoChip (StatelessWidget) thay cho _buildInfoChip.
+                      _HomeInfoChip(Icons.monitor_weight_rounded, '${weight.toStringAsFixed(1)} kg'),
+                      _HomeInfoChip(Icons.height_rounded, '${height.toStringAsFixed(0)} cm'),
+                      _HomeInfoChip(Icons.cake_rounded, '$age yrs'),
+                      _HomeInfoChip(Icons.person_rounded, gender),
+                      _HomeInfoChip(Icons.directions_run_rounded, 'Activity x$activityLevel'),
                     ],
                   ),
                   const SizedBox(height: 18),
@@ -680,22 +678,14 @@ class _HomeViewState extends State<HomeView> {
             }
 
             final entries = mealSnapshot.data ?? const <MealEntry>[];
-            final calories = entries.fold<double>(
-              0,
-              (total, item) => total + item.calories,
-            );
-            final protein = entries.fold<double>(
-              0,
-              (total, item) => total + item.protein,
-            );
-            final fat = entries.fold<double>(
-              0,
-              (total, item) => total + item.fat,
-            );
-            final carbs = entries.fold<double>(
-              0,
-              (total, item) => total + item.carbs,
-            );
+            // Gom 4 fold riêng thành 1 vòng lặp duy nhất → giảm số lần duyệt danh sách từ O(4n) xuống O(n).
+            double calories = 0, protein = 0, fat = 0, carbs = 0;
+            for (final item in entries) {
+              calories += item.calories;
+              protein += item.protein;
+              fat += item.fat;
+              carbs += item.carbs;
+            }
             final calorieGoal = latestRecord?.tdee.toDouble() ?? 2930.0;
             final caloriesLeft = calorieGoal - calories;
 
@@ -763,7 +753,8 @@ class _HomeViewState extends State<HomeView> {
                       ),
                     ],
                     const SizedBox(height: 16),
-                    ...entries.take(3).map(_buildMealPreviewChip),
+                    // Dùng _HomeMealPreviewChip (StatelessWidget) thay cho _buildMealPreviewChip.
+                    ...entries.take(3).map((e) => _HomeMealPreviewChip(entry: e)),
                   ],
                 ],
               ),
@@ -1032,14 +1023,75 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  // Reusable stat tile for calories, protein, BMI, TDEE, etc.
-  Widget _buildOverviewStat({
-    required String title,
-    required String value,
-    required String unit,
-    required IconData icon,
-    required Color color,
-  }) {
+  // _buildOverviewStat → đã tách thành _HomeOverviewStat (StatelessWidget) ở cuối file.
+
+  // _buildInfoChip → đã tách thành _HomeInfoChip (StatelessWidget) ở cuối file.
+
+  // _buildMealPreviewChip → đã tách thành _HomeMealPreviewChip (StatelessWidget) ở cuối file.
+
+  // Shared card style to keep the UI consistent and the code shorter.
+  BoxDecoration _cardDecoration({bool hasShadow = true}) => BoxDecoration(
+    color: _surface,
+    borderRadius: BorderRadius.circular(24),
+    border: Border.all(color: Colors.white10),
+    boxShadow: hasShadow ? _cardShadow : null,
+  );
+
+  ImageProvider? _avatarImage(String? photoUrl) =>
+      photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null;
+
+  String _getBmiStatus(double bmi) {
+    if (bmi < 18.5) {
+      return 'Underweight';
+    }
+    if (bmi < 25) {
+      return 'Normal';
+    }
+    if (bmi < 30) {
+      return 'Overweight';
+    }
+    return 'Obese';
+  }
+
+  Color _getBmiColor(double bmi) {
+    if (bmi < 18.5) {
+      return const Color(0xFF64B5F6);
+    }
+    if (bmi < 25) {
+      return Colors.greenAccent;
+    }
+    if (bmi < 30) {
+      return const Color(0xFFFFB74D);
+    }
+    return const Color(0xFFEF5350);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// HOME VIEW — PRIVATE STATELESS WIDGETS
+// Tách ra khỏi _HomeViewState để tối ưu rebuild.
+// Mỗi widget chỉ rebuild khi đúng prop của nó thay đổi, tránh cả cây
+// _HomeViewState phải vẽ lại khi data không liên quan thay đổi.
+// ═════════════════════════════════════════════════════════════════
+
+/// Stat tile: TDEE / BMR trong Latest Health Section.
+class _HomeOverviewStat extends StatelessWidget {
+  const _HomeOverviewStat({
+    required this.title,
+    required this.value,
+    required this.unit,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final String value;
+  final String unit;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1082,9 +1134,19 @@ class _HomeViewState extends State<HomeView> {
       ),
     );
   }
+}
 
-  // Small info chip for weight, gender, age, and similar data.
-  Widget _buildInfoChip(IconData icon, String text) {
+/// Small info chip: weight, gender, age, etc.
+class _HomeInfoChip extends StatelessWidget {
+  const _HomeInfoChip(this.icon, this.text);
+
+  final IconData icon;
+  final String text;
+
+  static const _accent = Color(0xFFE16D6D);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -1110,9 +1172,18 @@ class _HomeViewState extends State<HomeView> {
       ),
     );
   }
+}
 
-  // Quick preview for foods logged today.
-  Widget _buildMealPreviewChip(MealEntry entry) {
+/// Quick preview chip cho bữa ăn trong Today section.
+class _HomeMealPreviewChip extends StatelessWidget {
+  const _HomeMealPreviewChip({required this.entry});
+
+  final MealEntry entry;
+
+  static const _accent = Color(0xFFE16D6D);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 10),
@@ -1173,43 +1244,6 @@ class _HomeViewState extends State<HomeView> {
         ],
       ),
     );
-  }
-
-  // Shared card style to keep the UI consistent and the code shorter.
-  BoxDecoration _cardDecoration({bool hasShadow = true}) => BoxDecoration(
-    color: _surface,
-    borderRadius: BorderRadius.circular(24),
-    border: Border.all(color: Colors.white10),
-    boxShadow: hasShadow ? _cardShadow : null,
-  );
-
-  ImageProvider? _avatarImage(String? photoUrl) =>
-      photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null;
-
-  String _getBmiStatus(double bmi) {
-    if (bmi < 18.5) {
-      return 'Underweight';
-    }
-    if (bmi < 25) {
-      return 'Normal';
-    }
-    if (bmi < 30) {
-      return 'Overweight';
-    }
-    return 'Obese';
-  }
-
-  Color _getBmiColor(double bmi) {
-    if (bmi < 18.5) {
-      return const Color(0xFF64B5F6);
-    }
-    if (bmi < 25) {
-      return Colors.greenAccent;
-    }
-    if (bmi < 30) {
-      return const Color(0xFFFFB74D);
-    }
-    return const Color(0xFFEF5350);
   }
 }
 

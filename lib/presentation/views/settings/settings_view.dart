@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_application_1/data/repositories/auth_session_repository.dart';
 import 'package:flutter_application_1/data/repositories/language_repository.dart';
 import 'package:flutter_application_1/l10n/app_strings.dart';
-import 'package:flutter_application_1/main.dart' show AppRoutes;
 
 class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
@@ -113,11 +112,7 @@ class SettingsView extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               await AuthSessionRepository.signOut();
-              if (context.mounted) {
-                await Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil(AppRoutes.login, (r) => false);
-              }
+              // AuthGate stream tự detect logout và hiển thị SignInView
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF851414),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:flutter_application_1/data/repositories/bmi_repository.dart';
 import 'package:flutter_application_1/data/repositories/nutrition_repository.dart';
@@ -11,7 +12,8 @@ import 'package:flutter_application_1/data/models/vitamin_goal.dart';
 import 'package:flutter_application_1/presentation/widgets/ui.dart' as ui;
 
 class CaloTrackingView extends StatefulWidget {
-  const CaloTrackingView({super.key});
+  final bool isSelected;
+  const CaloTrackingView({super.key, this.isSelected = false});
 
   @override
   State<CaloTrackingView> createState() => _CaloTrackingViewState();
@@ -21,6 +23,14 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
   static const _accent = Color(0xFFE16D6D);
   static const _accentDeep = Color(0xFF8D1A1A);
   static const _surface = Color(0xFF171717);
+
+  @override
+  void didUpdateWidget(covariant CaloTrackingView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isSelected && oldWidget.isSelected) {
+      _clearSearch();
+    }
+  }
 
   final NutritionService _nutritionService = NutritionService.instance;
   final BmiService _bmiService = BmiService();
@@ -70,7 +80,9 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
         _isSearching = false;
         _hasSearched = true;
       });
-    } catch (_) {
+    } catch (e, stack) {
+      print("DEBUG: Error searching foods: $e");
+      print(stack);
       if (!mounted) {
         return;
       }
@@ -1145,11 +1157,13 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
   Widget build(BuildContext context) {
     final mealStream = _nutritionService.getTodayMealEntriesStream();
     final bmiStream = _bmiService.getLatestRecordStream();
+    final user = FirebaseAuth.instance.currentUser;
+    final photoUrl = user?.photoURL;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Calo Track',
           style: TextStyle(
             color: Color.fromARGB(255, 215, 215, 215),
@@ -1163,6 +1177,22 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: [
+          GestureDetector(
+            onTap: () => Scaffold.of(context).openEndDrawer(),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 20.0),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.grey.shade900,
+                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                child: photoUrl == null
+                    ? const Icon(Icons.person, color: Colors.white, size: 18)
+                    : null,
+              ),
+            ),
+          ),
+        ],
       ),
       body: mealStream == null
           ? _buildNotSignedIn()
@@ -1177,68 +1207,77 @@ class _CaloTrackingViewState extends State<CaloTrackingView> {
                     builder: (context, mealSnapshot) {
                       final entries = mealSnapshot.data ?? const <MealEntry>[];
 
-                      return CustomScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        slivers: [
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                20,
-                                12,
-                                20,
-                                10,
-                              ),
-                              child: Column(
-                                children: [
-                                  _buildWeekSelector(),
-                                  const SizedBox(height: 16),
-                                  _buildSummaryCard(entries, latestRecord),
-                                  const SizedBox(height: 18),
-                                  _buildSearchCard(),
-                                ],
-                              ),
-                            ),
-                          ),
-                          _buildSearchResults(),
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                20,
-                                10,
-                                20,
-                                10,
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'Diary',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          fontFamily: 'Poppins',
-                                        ),
-                                  ),
-                                ],
+                      return RefreshIndicator(
+                        color: _accent,
+                        onRefresh: () async {
+                          await Future.delayed(const Duration(seconds: 1));
+                          if (mounted) {
+                            setState(() {});
+                          }
+                        },
+                        child: CustomScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  12,
+                                  20,
+                                  10,
+                                ),
+                                child: Column(
+                                  children: [
+                                    _buildWeekSelector(),
+                                    const SizedBox(height: 16),
+                                    _buildSummaryCard(entries, latestRecord),
+                                    const SizedBox(height: 18),
+                                    _buildSearchCard(),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          if (entries.isEmpty)
-                            SliverToBoxAdapter(child: _buildEmptyDiary())
-                          else
-                            SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) =>
-                                    _buildMealEntryCard(entries[index]),
-                                childCount: entries.length,
+                            _buildSearchResults(),
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  10,
+                                  20,
+                                  10,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'Diary',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                            fontFamily: 'Poppins',
+                                          ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          const SliverToBoxAdapter(
-                            child: SizedBox(height: 110),
-                          ),
-                        ],
+                            if (entries.isEmpty)
+                              SliverToBoxAdapter(child: _buildEmptyDiary())
+                            else
+                              SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) =>
+                                      _buildMealEntryCard(entries[index]),
+                                  childCount: entries.length,
+                                ),
+                              ),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 110),
+                            ),
+                          ],
+                        ),
                       );
                     },
                   );

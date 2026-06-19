@@ -177,8 +177,6 @@ ButtonStyle outlineButtonStyle({
 // ── Micro-widgets ────────────────────────────────────────────────────────────
 
 /// Chip thông tin macro (calories, protein, fat, carbs…).
-///
-/// Dùng thay cho pattern `_macroChip` lặp trong calo_tracking_view.
 class MacroChip extends StatelessWidget {
   const MacroChip(this.title, this.value, {super.key});
 

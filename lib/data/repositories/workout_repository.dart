@@ -36,21 +36,26 @@ class WorkoutService {
   Future<List<CalisthenicsExercise>> getExercises() async {
     if (_exercisesCache != null) return _exercisesCache!;
 
-    final snapshot = await _firestore
-        .collection('exercises')
-        .orderBy('name')
-        .get();
+    try {
+      final snapshot = await _firestore
+          .collection('exercises')
+          .orderBy('name')
+          .get();
 
-    _exercisesCache = snapshot.docs
-        .map((doc) {
-          final data = doc.data();
-          // Đảm bảo field 'id' luôn có giá trị (dùng doc.id làm fallback)
-          if (!data.containsKey('id')) data['id'] = doc.id;
-          return CalisthenicsExercise.fromJson(data);
-        })
-        .toList(growable: false);
+      _exercisesCache = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            // Đảm bảo field 'id' luôn có giá trị (dùng doc.id làm fallback)
+            if (!data.containsKey('id')) data['id'] = doc.id;
+            return CalisthenicsExercise.fromJson(data);
+          })
+          .toList(growable: false);
 
-    return _exercisesCache!;
+      return _exercisesCache!;
+    } catch (e) {
+      print("Error loading exercises from Firestore: $e");
+      throw Exception("Failed to load exercises: $e");
+    }
   }
 
   // ── Xóa cache bài tập (dùng khi cần refresh) ──────────────
@@ -60,14 +65,19 @@ class WorkoutService {
   Future<void> saveSession(WorkoutSessionRecord record) async {
     final user = currentUser;
     if (user == null) return;
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('workout_sessions')
-        .add({
-          ...record.toMap(),
-          'server_time': FieldValue.serverTimestamp(),
-        });
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('workout_sessions')
+          .add({
+            ...record.toMap(),
+            'server_time': FieldValue.serverTimestamp(),
+          });
+    } catch (e) {
+      print("Error saving workout session: $e");
+      throw Exception("Failed to save workout session: $e");
+    }
   }
 
   // ── Stream lịch sử buổi tập (30 ngày gần nhất) ────────────
@@ -75,21 +85,26 @@ class WorkoutService {
     final user = currentUser;
     if (user == null) return null;
     final cutoff = DateTime.now().subtract(const Duration(days: 30));
-    return _firestore
-        .collection('users')
-        .doc(user.uid)
-        .collection('workout_sessions')
-        .where(
-          'completed_at',
-          isGreaterThanOrEqualTo: cutoff.toIso8601String(),
-        )
-        .orderBy('completed_at', descending: true)
-        .snapshots()
-        .map(
-          (snap) => snap.docs
-              .map((d) => WorkoutSessionRecord.fromMap(d.id, d.data()))
-              .toList(),
-        );
+    try {
+      return _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('workout_sessions')
+          .where(
+            'completed_at',
+            isGreaterThanOrEqualTo: cutoff.toIso8601String(),
+          )
+          .orderBy('completed_at', descending: true)
+          .snapshots()
+          .map(
+            (snap) => snap.docs
+                .map((d) => WorkoutSessionRecord.fromMap(d.id, d.data()))
+                .toList(),
+          );
+    } catch (e) {
+      print("Error getting workout sessions stream: $e");
+      return Stream.value(<WorkoutSessionRecord>[]);
+    }
   }
 
   // ── Tải lịch tập (Hive trước, Firebase sau) ───────────────
@@ -97,10 +112,14 @@ class WorkoutService {
     final emptyPlan = _emptyPlan();
 
     // 1. Đọc từ Hive (local cache — nhanh)
-    final box = await Hive.openBox(_scheduleBox);
-    final saved = box.get(_weeklyPlanKey);
-    if (saved is Map) {
-      _applyPlanMap(emptyPlan, saved);
+    try {
+      final box = await Hive.openBox(_scheduleBox);
+      final saved = box.get(_weeklyPlanKey);
+      if (saved is Map) {
+        _applyPlanMap(emptyPlan, saved);
+      }
+    } catch (e) {
+      print("Error reading plan from local Hive cache: $e");
     }
 
     // 2. Đồng bộ từ Firebase nếu đã đăng nhập
@@ -115,10 +134,11 @@ class WorkoutService {
         if (remotePlan is Map) {
           _applyPlanMap(emptyPlan, remotePlan);
           // Ghi ngược lại Hive để đồng bộ offline
+          final box = await Hive.openBox(_scheduleBox);
           await box.put(_weeklyPlanKey, _serializePlan(emptyPlan));
         }
-      } catch (_) {
-        // Không có mạng → dùng dữ liệu Hive
+      } catch (e) {
+        print("Error syncing training schedule from Firebase: $e");
       }
     }
 
@@ -131,20 +151,29 @@ class WorkoutService {
   ) async {
     final serialized = _serializePlan(plan);
 
-    // Lưu local trước (offline first)
-    final box = await Hive.openBox(_scheduleBox);
-    await box.put(_weeklyPlanKey, serialized);
+    try {
+      // Lưu local trước (offline first)
+      final box = await Hive.openBox(_scheduleBox);
+      await box.put(_weeklyPlanKey, serialized);
+    } catch (e) {
+      print("Error saving plan to local Hive cache: $e");
+    }
 
     // Sync lên Firebase nếu đã đăng nhập
     final user = currentUser;
     if (user == null) return;
-    await _firestore
-        .collection('training_schedules')
-        .doc(user.uid)
-        .set({
-          _weeklyPlanKey: serialized,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+    try {
+      await _firestore
+          .collection('training_schedules')
+          .doc(user.uid)
+          .set({
+            _weeklyPlanKey: serialized,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    } catch (e) {
+      print("Error syncing plan to Firebase: $e");
+      throw Exception("Failed to sync training schedule online: $e");
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────

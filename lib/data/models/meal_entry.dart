@@ -61,4 +61,25 @@ class MealEntry {
       fiber: (map['fiber'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'food_name': foodName,
+      'description': description,
+      'grams': grams,
+      'calories': calories,
+      'protein': protein,
+      'fat': fat,
+      'carbs': carbs,
+      'meal_type': mealType,
+      'logged_at': loggedAt,
+      'is_custom': isCustom,
+      'vitamin_c': vitaminC,
+      'vitamin_a': vitaminA,
+      'vitamin_b1': vitaminB1,
+      'calcium': calcium,
+      'iron': iron,
+      'fiber': fiber,
+    };
+  }
 }

@@ -8,6 +8,7 @@
 /// - Dùng `BmiRecord.fromMap(...)` để khôi phục bản ghi từ dữ liệu Firestore.
 /// - Dùng `toMap()` để chuẩn bị dữ liệu trước khi lưu lên Firestore.
 class BmiRecord {
+  final String? id;
   // Dữ liệu đầu vào
   final double weight;
   final double height;
@@ -24,6 +25,7 @@ class BmiRecord {
   final DateTime timestamp;
 
   BmiRecord({
+    this.id,
     required this.weight,
     required this.height,
     required this.age,
@@ -44,6 +46,10 @@ class BmiRecord {
     required String gender,
     required double activityLevel,
   }) {
+    if (weight <= 0) throw ArgumentError('Weight must be greater than 0');
+    if (height <= 0) throw ArgumentError('Height must be greater than 0');
+    if (age <= 0) throw ArgumentError('Age must be greater than 0');
+
     // Tính BMI
     final double heightM = height / 100;
     final double bmiVal = double.parse(
@@ -58,6 +64,7 @@ class BmiRecord {
     final int tdeeVal = (bmrVal * activityLevel).round();
 
     return BmiRecord(
+      id: null,
       weight: weight,
       height: height,
       age: age,
@@ -72,9 +79,10 @@ class BmiRecord {
   }
 
   /// Tạo BmiRecord từ Map đọc từ Firestore
-  factory BmiRecord.fromMap(Map<String, dynamic> map, DateTime date) {
+  factory BmiRecord.fromMap(Map<String, dynamic> map, DateTime date, [String? id]) {
     final double bmiVal = (map['bmi'] as num?)?.toDouble() ?? 0.0;
     return BmiRecord(
+      id: id,
       weight: (map['weight'] as num?)?.toDouble() ?? 0.0,
       height: (map['height'] as num?)?.toDouble() ?? 0.0,
       age: (map['age'] as num?)?.toInt() ?? 0,

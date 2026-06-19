@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 //  SERVICE: BmiService
 //  Chịu trách nhiệm giao tiếp với Firebase Firestore.
 //  Tách biệt hoàn toàn logic lưu/đọc dữ liệu khỏi UI.
@@ -30,11 +30,16 @@ class BmiService {
     final user = currentUser;
     if (user == null) throw Exception('User not signed in');
 
-    // Dùng serverTimestamp thay vì timestamp client để đảm bảo đồng bộ
-    final map = record.toMap();
-    map['timestamp'] = FieldValue.serverTimestamp();
+    try {
+      // Dùng serverTimestamp thay vì timestamp client để đảm bảo đồng bộ
+      final map = record.toMap();
+      map['timestamp'] = FieldValue.serverTimestamp();
 
-    await _userRecords(user.uid).add(map);
+      await _userRecords(user.uid).add(map);
+    } catch (e) {
+      print("Error saving BMI record: $e");
+      throw Exception("Failed to save body metrics record: $e");
+    }
   }
 
   // ── Stream danh sách bản ghi (realtime) ───────────────────
@@ -43,35 +48,58 @@ class BmiService {
     final user = currentUser;
     if (user == null) return null;
 
-    return _userRecords(user.uid)
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        final ts = data['timestamp'] as Timestamp?;
-        final date = ts?.toDate() ?? DateTime.now();
-        return BmiRecord.fromMap(data, date);
-      }).toList();
-    });
+    try {
+      return _userRecords(user.uid)
+          .orderBy('timestamp', descending: true)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          final ts = data['timestamp'] as Timestamp?;
+          final date = ts?.toDate() ?? DateTime.now();
+          return BmiRecord.fromMap(data, date, doc.id);
+        }).toList();
+      });
+    } catch (e) {
+      print("Error getting BMI records stream: $e");
+      return Stream.value(<BmiRecord>[]);
+    }
   }
 
   Stream<BmiRecord?>? getLatestRecordStream() {
     final user = currentUser;
     if (user == null) return null;
 
-    return _userRecords(user.uid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .snapshots()
-        .map((snapshot) {
-      if (snapshot.docs.isEmpty) {
-        return null;
-      }
-      final data = snapshot.docs.first.data();
-      final ts = data['timestamp'] as Timestamp?;
-      final date = ts?.toDate() ?? DateTime.now();
-      return BmiRecord.fromMap(data, date);
-    });
+    try {
+      return _userRecords(user.uid)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .snapshots()
+          .map((snapshot) {
+        if (snapshot.docs.isEmpty) {
+          return null;
+        }
+        final doc = snapshot.docs.first;
+        final data = doc.data();
+        final ts = data['timestamp'] as Timestamp?;
+        final date = ts?.toDate() ?? DateTime.now();
+        return BmiRecord.fromMap(data, date, doc.id);
+      });
+    } catch (e) {
+      print("Error getting latest BMI record stream: $e");
+      return Stream.value(null);
+    }
+  }
+
+  // ── Xóa bản ghi tính BMI ──────────────────────────────────
+  Future<void> deleteRecord(String recordId) async {
+    final user = currentUser;
+    if (user == null) throw Exception('User not signed in');
+    try {
+      await _userRecords(user.uid).doc(recordId).delete();
+    } catch (e) {
+      print("Error deleting BMI record: $e");
+      throw Exception("Failed to delete BMI record: $e");
+    }
   }
 }

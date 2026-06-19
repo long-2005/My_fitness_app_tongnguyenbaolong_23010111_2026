@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:flutter_application_1/data/repositories/workout_repository.dart';
 import 'package:flutter_application_1/data/models/calisthenics_exercise.dart';
@@ -10,7 +11,8 @@ import 'package:flutter_application_1/data/models/workout_exercise.dart';
 import 'package:flutter_application_1/presentation/views/workout/workout_session_view.dart';
 
 class ScheduleView extends StatefulWidget {
-  const ScheduleView({super.key});
+  final bool isSelected;
+  const ScheduleView({super.key, this.isSelected = false});
 
   @override
   State<ScheduleView> createState() => _ScheduleViewState();
@@ -18,6 +20,14 @@ class ScheduleView extends StatefulWidget {
 
 class _ScheduleViewState extends State<ScheduleView> {
   static const _accent = Color(0xFFE16D6D);
+
+  @override
+  void didUpdateWidget(covariant ScheduleView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isSelected && oldWidget.isSelected) {
+      _clearExerciseSearch();
+    }
+  }
   static const _navSelected = Color.fromARGB(255, 133, 20, 20);
   static const _surface = Color.fromARGB(16, 218, 218, 218);
   static const _svgAsset = 'assets/image/new1.svg';
@@ -153,13 +163,18 @@ class _ScheduleViewState extends State<ScheduleView> {
   }
 
   Future<void> _loadExercises() async {
-    final exercises = await WorkoutService.instance.getExercises();
-    if (!mounted) return;
-    setState(() {
-      _exercises = List.of(exercises);
-      _exerciseById = {for (final e in _exercises) e.id: e};
-      _invalidateSvgCache();
-    });
+    try {
+      final exercises = await WorkoutService.instance.getExercises();
+      if (!mounted) return;
+      setState(() {
+        _exercises = List.of(exercises);
+        _exerciseById = {for (final e in _exercises) e.id: e};
+        _invalidateSvgCache();
+      });
+    } catch (e, stack) {
+      print("DEBUG: Error loading exercises: $e");
+      print(stack);
+    }
   }
 
   Future<void> _loadWeeklyPlan() async {
@@ -191,53 +206,77 @@ class _ScheduleViewState extends State<ScheduleView> {
         .where((muscles) => muscles.isNotEmpty)
         .length;
 
+    final user = FirebaseAuth.instance.currentUser;
+    final photoUrl = user?.photoURL;
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: Colors.black,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            titleSpacing: 20,
-            title: const Text(
-              'Training Schedule',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontFamily: 'Poppins',
+      body: RefreshIndicator(
+        color: _accent,
+        onRefresh: () async {
+          WorkoutService.instance.clearExerciseCache();
+          await _loadExercises();
+          await _loadWeeklyPlan();
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: Colors.black,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              titleSpacing: 20,
+              title: const Text(
+                'Training Schedule',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Reset week',
+                  onPressed: _clearWeek,
+                  icon: const Icon(Icons.restart_alt_rounded, color: _accent),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => Scaffold.of(context).openEndDrawer(),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.grey.shade900,
+                    backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                    child: photoUrl == null
+                        ? const Icon(Icons.person, color: Colors.white, size: 18)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 20),
+              ],
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildSummary(activeMuscles, totalSessions),
+                  const SizedBox(height: 16),
+                  _buildMuscleMap(frequency),
+                  const SizedBox(height: 16),
+                  _buildDaySelector(),
+                  const SizedBox(height: 12),
+                  _buildDayScheduleBoard(),
+                  const SizedBox(height: 16),
+                  _buildScheduleBuilder(),
+                  const SizedBox(height: 16),
+                  _buildWeeklyBreakdown(frequency),
+                ]),
               ),
             ),
-            actions: [
-              IconButton(
-                tooltip: 'Reset week',
-                onPressed: _clearWeek,
-                icon: const Icon(Icons.restart_alt_rounded, color: _accent),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildSummary(activeMuscles, totalSessions),
-                const SizedBox(height: 16),
-                _buildMuscleMap(frequency),
-                const SizedBox(height: 16),
-                _buildDaySelector(),
-                const SizedBox(height: 12),
-                _buildDayScheduleBoard(),
-                const SizedBox(height: 16),
-                _buildScheduleBuilder(),
-                const SizedBox(height: 16),
-                _buildWeeklyBreakdown(frequency),
-              ]),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

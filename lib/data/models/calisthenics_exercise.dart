@@ -11,13 +11,20 @@ class CalisthenicsExercise {
 
   factory CalisthenicsExercise.fromJson(dynamic json) {
     final map = json as Map<String, dynamic>;
+    final primaryList = map['primaryMuscles'] ?? map['primary_muscles'];
+    final secondaryList = map['secondaryMuscles'] ?? map['secondary_muscles'];
+
     return CalisthenicsExercise(
-      id: map['id'] as String,
-      name: map['name'] as String,
-      level: map['level'] as String,
-      equipment: map['equipment'] as String,
-      primaryMuscles: List<String>.from(map['primaryMuscles'] as List),
-      secondaryMuscles: List<String>.from(map['secondaryMuscles'] as List),
+      id: map['id'] as String? ?? '',
+      name: map['name'] as String? ?? 'Unnamed Exercise',
+      level: map['level'] as String? ?? 'Beginner',
+      equipment: map['equipment'] as String? ?? 'None',
+      primaryMuscles: primaryList is List 
+          ? List<String>.from(primaryList) 
+          : <String>[],
+      secondaryMuscles: secondaryList is List 
+          ? List<String>.from(secondaryList) 
+          : <String>[],
     );
   }
 
