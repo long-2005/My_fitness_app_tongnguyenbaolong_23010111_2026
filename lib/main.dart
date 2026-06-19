@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
@@ -18,11 +19,26 @@ void main() async {
   await Hive.initFlutter();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (kIsWeb) {
+    // Fix đăng nhập fb: Khởi tạo Facebook SDK trên nền tảng Web
     await FacebookAuth.instance.webAndDesktopInitialize(
       appId: '1634772734402321',
       cookie: true,
       xfbml: true,
       version: 'v18.0',
+    );
+  }
+
+  // App Check cho Android/iOS — bỏ qua web (chưa có reCAPTCHA key).
+  // Debug mode: tự sinh token debug, in ra logcat → đăng ký trên Firebase Console.
+  // Release Android: Play Integrity; Release iOS: Device Check.
+  if (!kIsWeb) {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode
+          ? AndroidProvider.debug
+          : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode
+          ? AppleProvider.debug
+          : AppleProvider.deviceCheck,
     );
   }
 

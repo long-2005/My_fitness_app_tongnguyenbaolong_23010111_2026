@@ -101,10 +101,11 @@ class _SignInViewState extends State<SignInView> {
 
   Future<void> _navigateToHome() async {
     if (!mounted) return;
-
+    // Về root '/' = AuthGate, không phải '/home' trực tiếp.
+    // Khi logout, AuthGate stream tự detect và chuyển về SignInView.
     await Navigator.of(
       context,
-    ).pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+    ).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -142,9 +143,7 @@ class _SignInViewState extends State<SignInView> {
       }
       debugPrint('Unexpected Google sign-in error: $e');
     } finally {
-      if (mounted && ModalRoute.of(context)?.settings.name == AppRoutes.login) {
-        _setLoading(false);
-      }
+      _setLoading(false);
     }
   }
 
@@ -152,6 +151,7 @@ class _SignInViewState extends State<SignInView> {
     _setLoading(true);
 
     try {
+      // Fix đăng nhập fb: Sử dụng FacebookAuth login với các quyền cấu hình hợp lệ
       final LoginResult loginResult = await FacebookAuth.instance.login(
         permissions: const ['email', 'public_profile'],
       );
@@ -189,9 +189,7 @@ class _SignInViewState extends State<SignInView> {
       }
       debugPrint('Unexpected Facebook sign-in error: $e');
     } finally {
-      if (mounted && ModalRoute.of(context)?.settings.name == AppRoutes.login) {
-        _setLoading(false);
-      }
+      _setLoading(false);
     }
   }
 
@@ -223,9 +221,7 @@ class _SignInViewState extends State<SignInView> {
       }
       debugPrint('Unexpected sign-in error: $e');
     } finally {
-      if (mounted && ModalRoute.of(context)?.settings.name == AppRoutes.login) {
-        _setLoading(false);
-      }
+      _setLoading(false);
     }
   }
 
