@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -120,29 +122,54 @@ class _ScheduleViewState extends State<ScheduleView> {
   // Fast exercise lookup
   Map<String, CalisthenicsExercise> _exerciseById = {};
 
+  // ── Search debounce & display limit ───────────────────────
+  Timer? _debounce;
+  static const int _pageSize = 30; // số kết quả hiển thị tối đa mỗi lần
+  int _displayLimit = _pageSize;   // tăng dần khi nhấn "Show more"
+
   @override
   void initState() {
     super.initState();
     _loadSvg();
     _loadExercises();
     _loadWeeklyPlan();
-    // Listener removed: calling setState on every keystroke triggered a full
-    // rebuild including expensive SVG painting. Search applies on submit only.
+    // Debounced listener: cập nhật kết quả 300ms sau khi người dùng ngừng gõ.
+    // Không gọi setState ngay lập tức → keyboard không bị lag.
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final searchQuery = _searchController.text.trim().toLowerCase();
+      // Chỉ rebuild phần search results, không ảnh hưởng SVG cache
+      setState(() {
+        _query = searchQuery;
+        _displayLimit = _pageSize;
+        _hasSearched = searchQuery.isNotEmpty || _muscleFilter != null;
+        _searchResults = _hasSearched ? _filteredExercises : const [];
+      });
+    });
   }
 
   void _submitExerciseSearch([String? query]) {
+    _debounce?.cancel();
     final searchQuery = (query ?? _searchController.text).trim().toLowerCase();
     setState(() {
       _query = searchQuery;
+      _displayLimit = _pageSize;
       _hasSearched = searchQuery.isNotEmpty || _muscleFilter != null;
       _searchResults = _hasSearched ? _filteredExercises : const [];
     });
   }
 
   void _clearExerciseSearch() {
+    _debounce?.cancel();
     _searchController.clear();
     setState(() {
       _query = '';
+      _displayLimit = _pageSize;
       _searchResults = const [];
       _hasSearched = false;
     });
@@ -150,6 +177,8 @@ class _ScheduleViewState extends State<ScheduleView> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -259,8 +288,8 @@ class _ScheduleViewState extends State<ScheduleView> {
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
+              sliver: SliverList.list(
+                children: [
                   _buildSummary(activeMuscles, totalSessions),
                   const SizedBox(height: 16),
                   _buildMuscleMap(frequency),
@@ -272,7 +301,7 @@ class _ScheduleViewState extends State<ScheduleView> {
                   _buildScheduleBuilder(),
                   const SizedBox(height: 16),
                   _buildWeeklyBreakdown(frequency),
-                ]),
+                ],
               ),
             ),
           ],
@@ -353,10 +382,12 @@ class _ScheduleViewState extends State<ScheduleView> {
                           if (snapshot.hasError || !snapshot.hasData) {
                             return const Icon(Icons.error_outline_rounded, color: Colors.white54);
                           }
-                          return SvgPicture.string(
-                            snapshot.data!,
-                            fit: BoxFit.contain,
-                            width: double.infinity,
+                          return RepaintBoundary(
+                            child: SvgPicture.string(
+                              snapshot.data!,
+                              fit: BoxFit.contain,
+                              width: double.infinity,
+                            ),
                           );
                         },
                       ),
@@ -501,7 +532,7 @@ class _ScheduleViewState extends State<ScheduleView> {
             )
           else if (!_hasSearched)
             Text(
-              'Search by name or use the filter button to find exercises.',
+              'Nhập tên bài hoặc dùng bộ lọc để tìm bài tập.',
               style: TextStyle(
                 color: Colors.grey.shade400,
                 fontSize: 13,
@@ -510,7 +541,7 @@ class _ScheduleViewState extends State<ScheduleView> {
             )
           else if (_searchResults.isEmpty)
             Text(
-              'No exercises match this search.',
+              'Không tìm thấy bài tập phù hợp.',
               style: TextStyle(
                 color: Colors.grey.shade400,
                 fontSize: 13,
@@ -518,13 +549,67 @@ class _ScheduleViewState extends State<ScheduleView> {
               ),
             )
           else
-            for (final exercise in _searchResults)
-              _exerciseTile(
-                exercise,
-                selectedExerciseIds.contains(exercise.id),
-              ),
+            _buildSearchResultsList(selectedExerciseIds),
         ],
       ),
+    );
+  }
+
+  /// Render danh sách kết quả tìm kiếm theo kiểu lazy:
+  /// - Chỉ build tối đa [_displayLimit] tile một lúc
+  /// - Nút "Show more" để tải thêm 30 kết quả tiếp theo
+  Widget _buildSearchResultsList(Set<String> selectedExerciseIds) {
+    final visible = _searchResults.take(_displayLimit).toList();
+    final hasMore = _searchResults.length > _displayLimit;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Lazy ListView — chỉ build widget nào đang nằm trong viewport
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: visible.length,
+          itemBuilder: (context, index) {
+            final exercise = visible[index];
+            return _exerciseTile(
+              exercise,
+              selectedExerciseIds.contains(exercise.id),
+            );
+          },
+        ),
+        // Đếm tổng + nút xem thêm
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 4),
+          child: Row(
+            children: [
+              Text(
+                'Hiển thị ${visible.length}/${_searchResults.length} bài tập',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 11,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const Spacer(),
+              if (hasMore)
+                TextButton.icon(
+                  onPressed: () => setState(() => _displayLimit += _pageSize),
+                  icon: const Icon(Icons.expand_more_rounded, size: 18),
+                  label: const Text(
+                    'Xem thêm',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: _accent),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

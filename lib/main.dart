@@ -65,7 +65,7 @@ class HealthApp extends StatelessWidget {
   const HealthApp({super.key});
 
   // Bật/tắt hiển thị FPS và hiệu năng trên màn hình (để test mượt mà)
-  static const bool showFpsOverlay = false;
+  static const bool showFpsOverlay = true;
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +143,7 @@ class FpsCounter extends StatefulWidget {
 
 class _FpsCounterState extends State<FpsCounter>
     with SingleTickerProviderStateMixin {
-  int _fps = 0;
+  final ValueNotifier<int> _fpsNotifier = ValueNotifier<int>(0);
   int _frameCount = 0;
   DateTime _lastTime = DateTime.now();
   late Ticker _ticker;
@@ -160,11 +160,7 @@ class _FpsCounterState extends State<FpsCounter>
     final now = DateTime.now();
     final diff = now.difference(_lastTime).inMilliseconds;
     if (diff >= 1000) {
-      if (mounted) {
-        setState(() {
-          _fps = (_frameCount * 1000 / diff).round();
-        });
-      }
+      _fpsNotifier.value = (_frameCount * 1000 / diff).round();
       _frameCount = 0;
       _lastTime = now;
     }
@@ -173,6 +169,7 @@ class _FpsCounterState extends State<FpsCounter>
   @override
   void dispose() {
     _ticker.dispose();
+    _fpsNotifier.dispose();
     super.dispose();
   }
 
@@ -187,36 +184,41 @@ class _FpsCounterState extends State<FpsCounter>
             top: 45, // Nằm dưới thanh trạng thái
             right: 20, // Góc phải
             child: IgnorePointer(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _fps >= 50 ? Colors.green : Colors.redAccent,
-                    width: 1.5,
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black54,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
+              child: ValueListenableBuilder<int>(
+                valueListenable: _fpsNotifier,
+                builder: (context, fps, _) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                  ],
-                ),
-                child: Text(
-                  '$_fps FPS',
-                  style: TextStyle(
-                    color: _fps >= 50 ? Colors.greenAccent : Colors.redAccent,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: fps >= 50 ? Colors.green : Colors.redAccent,
+                        width: 1.5,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black54,
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      '$fps FPS',
+                      style: TextStyle(
+                        color: fps >= 50 ? Colors.greenAccent : Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),

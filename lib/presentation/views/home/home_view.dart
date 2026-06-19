@@ -34,6 +34,38 @@ class _HomeViewState extends State<HomeView> {
   final NutritionService _nutritionService = NutritionService.instance;
   final BmiService _bmiService = BmiService();
 
+  // ValueNotifier dùng để truyền selected index cho CaloTrackingView và
+  // ScheduleView mà không cần rebuild toàn bộ page tree.
+  final ValueNotifier<int> _selectedIndexNotifier = ValueNotifier<int>(0);
+
+  late final Widget _bmiView;
+  late final Widget _caloTrackingView;
+  late final Widget _scheduleView;
+
+  @override
+  void initState() {
+    super.initState();
+    _bmiView = const RepaintBoundary(child: BmiView());
+    _caloTrackingView = RepaintBoundary(
+      child: ValueListenableBuilder<int>(
+        valueListenable: _selectedIndexNotifier,
+        builder: (_, idx, __) => CaloTrackingView(isSelected: idx == 2),
+      ),
+    );
+    _scheduleView = RepaintBoundary(
+      child: ValueListenableBuilder<int>(
+        valueListenable: _selectedIndexNotifier,
+        builder: (_, idx, __) => ScheduleView(isSelected: idx == 3),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _selectedIndexNotifier.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -42,6 +74,7 @@ class _HomeViewState extends State<HomeView> {
 
     return Scaffold(
       key: _scaffoldKey,
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.black,
       endDrawer: _buildProfileDrawer(user),
       body: SafeArea(
@@ -83,6 +116,9 @@ class _HomeViewState extends State<HomeView> {
             setState(() {
               _selectedIndex = index;
             });
+            // Notifier chỉ cập nhật CaloTrackingView và ScheduleView —
+            // không làm rebuild toàn bộ _HomeViewState.
+            _selectedIndexNotifier.value = index;
           },
           destinations: [
             NavigationDestination(
@@ -112,37 +148,41 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // Main tabs rendered by the bottom navigation bar.
+  // RepaintBoundary được dùng để cô lập việc repaint giữa các tab — tab
+  // không active sẽ không bị repaint khi tab active thay đổi.
   List<Widget> _pages(User? user, String? photoUrl) => [
-    RefreshIndicator(
-      onRefresh: () async {
-        await Future.delayed(const Duration(seconds: 1));
-        if (mounted) {
-          setState(() {});
-        }
-      },
-      child: CustomScrollView(
-        slivers: [
-          _buildHomeAppBar(user, photoUrl),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Column(
-                children: [
-                  _buildLatestHealthSection(user),
-                  const SizedBox(height: 18),
-                  _buildTodayNutritionSection(user),
-                  const SizedBox(height: 18),
-                  const ProgressView(embedded: true),
-                ],
+    RepaintBoundary(
+      child: RefreshIndicator(
+        onRefresh: () async {
+          await Future.delayed(const Duration(seconds: 1));
+          if (mounted) {
+            setState(() {});
+          }
+        },
+        child: CustomScrollView(
+          slivers: [
+            _buildHomeAppBar(user, photoUrl),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Column(
+                  children: [
+                    _buildLatestHealthSection(user),
+                    const SizedBox(height: 18),
+                    _buildTodayNutritionSection(user),
+                    const SizedBox(height: 18),
+                    const ProgressView(embedded: true),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
-    const BmiView(),
-    CaloTrackingView(isSelected: _selectedIndex == 2),
-    ScheduleView(isSelected: _selectedIndex == 3),
+    _bmiView,
+    _caloTrackingView,
+    _scheduleView,
   ];
 
   // Home app bar: greeting, logo, and user avatar.
@@ -168,7 +208,7 @@ class _HomeViewState extends State<HomeView> {
             alignment: Alignment.centerLeft,
             child: Builder(
               builder: (context) => SizedBox(
-                width: MediaQuery.of(context).size.width * 0.35,
+                width: MediaQuery.sizeOf(context).width * 0.35,
                 child: Text(
                   '${s.welcomeBack} $username',
                   style: const TextStyle(
@@ -221,7 +261,7 @@ class _HomeViewState extends State<HomeView> {
     final email = user?.email ?? '';
 
     return Drawer(
-      width: MediaQuery.of(context).size.width * 0.78,
+      width: MediaQuery.sizeOf(context).width * 0.78,
       backgroundColor: const Color(0xFF0F0F0F),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
